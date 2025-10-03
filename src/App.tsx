@@ -15,6 +15,9 @@ import QualityControl from "./pages/QualityControl";
 import AIDocumentDemo from "./pages/AIDocumentDemo";
 import Reports from "./pages/Reports";
 import UserManagement from "./pages/UserManagement";
+import DeliveryManagement from "./pages/DeliveryManagement";
+import IssuesManagement from "./pages/IssuesManagement";
+import PlantMaintenance from "./pages/PlantMaintenance";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +41,9 @@ const App = () => (
             <Route path="/ai-demo" element={<AIDocumentDemo />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/users" element={<UserManagement />} />
+            <Route path="/deliveries" element={<DeliveryManagement />} />
+            <Route path="/issues" element={<IssuesManagement />} />
+            <Route path="/maintenance" element={<PlantMaintenance />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

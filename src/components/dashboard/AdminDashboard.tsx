@@ -405,6 +405,21 @@ const AdminDashboard = () => {
               <span className="font-medium">Quality Control</span>
               <span className="text-xs text-muted-foreground">Test Results & COAs</span>
             </Button>
+            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/deliveries')}>
+              <Truck className="w-8 h-8 mb-2 text-blue-600" />
+              <span className="font-medium">Deliveries</span>
+              <span className="text-xs text-muted-foreground">Track & Manage</span>
+            </Button>
+            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/issues')}>
+              <AlertTriangle className="w-8 h-8 mb-2 text-red-600" />
+              <span className="font-medium">Issues</span>
+              <span className="text-xs text-muted-foreground">Report & Resolve</span>
+            </Button>
+            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/maintenance')}>
+              <Settings className="w-8 h-8 mb-2 text-purple-600" />
+              <span className="font-medium">Plant Maintenance</span>
+              <span className="text-xs text-muted-foreground">Equipment & Tasks</span>
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -36,8 +36,17 @@ const SiteAgentDashboard = () => {
     volume: '',
     grade: '25MPa',
     deliveryDate: '',
-    deliveryTime: '08:00'
+    deliveryTime: '08:00',
+    selectedAgent: ''
   });
+
+  // Available agents for selection
+  const [availableAgents, setAvailableAgents] = useState([
+    { id: 'AGT-001', name: 'Alex Johnson', phone: '+27 82 111 2222', email: 'alex@constructionsite.co.za', site: 'Housing Project A', company: 'BuildRight Construction', status: 'Active' },
+    { id: 'AGT-002', name: 'Maria Santos', phone: '+27 83 333 4444', email: 'maria@commercialdev.co.za', site: 'Commercial Complex', company: 'Commercial Developers', status: 'Active' },
+    { id: 'AGT-003', name: 'James Brown', phone: '+27 84 555 6666', email: 'james@bridgeworks.co.za', site: 'Bridge Construction', company: 'Bridge Works Ltd', status: 'Inactive' },
+    { id: 'AGT-004', name: 'Sarah Wilson', phone: '+27 85 777 8888', email: 'sarah@roadbuilders.co.za', site: 'Road Extension', company: 'Road Builders Inc', status: 'Active' }
+  ]);
 
   // Project Areas and Structures - now as state
   const [projectAreas, setProjectAreas] = useState<ProjectArea[]>([]);
@@ -167,14 +176,15 @@ const SiteAgentDashboard = () => {
   };
 
   const handleQuickOrder = () => {
-    if (!quickOrderData.area || !quickOrderData.structure || !quickOrderData.volume) {
-      alert('Please fill in all required fields for quick order');
+    if (!quickOrderData.area || !quickOrderData.structure || !quickOrderData.volume || !quickOrderData.selectedAgent) {
+      alert('Please fill in all required fields for quick order (including agent selection)');
       return;
     }
     
     setSyncStatus('syncing');
     try {
       // Create order using real-time service
+      const selectedAgent = availableAgents.find(a => a.id === quickOrderData.selectedAgent);
       const orderData = {
         projectName: 'Quick Order',
         location: 'Site Location',
@@ -186,9 +196,9 @@ const SiteAgentDashboard = () => {
         deliveryDate: quickOrderData.deliveryDate,
         deliveryTime: quickOrderData.deliveryTime,
         status: 'Pending' as const,
-        contactName: 'Site Agent',
-        contactPhone: '+27 82 123 4567',
-        specialInstructions: 'Quick order from site agent'
+        contactName: selectedAgent ? selectedAgent.name : 'Site Agent',
+        contactPhone: selectedAgent ? selectedAgent.phone : '+27 82 123 4567',
+        specialInstructions: selectedAgent ? `Order placed by ${selectedAgent.name} from ${selectedAgent.company}` : 'Quick order from site agent'
       };
       
       const newOrder = realTimeDataService.createOrder(orderData);
@@ -204,7 +214,8 @@ const SiteAgentDashboard = () => {
         volume: '',
         grade: '25MPa',
         deliveryDate: '',
-        deliveryTime: '08:00'
+        deliveryTime: '08:00',
+        selectedAgent: ''
       });
       setSelectedArea('');
       setSelectedStructure('');
@@ -229,8 +240,40 @@ const SiteAgentDashboard = () => {
     }
   };
 
-  // Next Delivery Data
-  const nextDelivery = {
+  const handleConfirmArrival = () => {
+    const confirmed = confirm('Confirm truck arrival on site? This will update the delivery status.');
+    if (confirmed) {
+      setSyncStatus('syncing');
+      try {
+        // Update the delivery timeline to mark arrival as completed
+        setDeliveryTimeline(prev => 
+          prev.map(item => 
+            item.event === 'On Site Delivery' 
+              ? { ...item, completed: true, description: `Confirmed arrival at ${new Date().toLocaleTimeString()}` }
+              : item
+          )
+        );
+        
+        // Update next delivery status
+        setNextDelivery(prev => ({
+          ...prev,
+          status: 'On Site'
+        }));
+        
+        setSyncStatus('connected');
+        setLastSync(new Date().toLocaleTimeString());
+        
+        alert(`Arrival confirmed for truck ${nextDelivery.truck_id} at ${new Date().toLocaleTimeString()}`);
+      } catch (error) {
+        console.error('Failed to confirm arrival:', error);
+        setSyncStatus('disconnected');
+        alert('Failed to confirm arrival. Please try again.');
+      }
+    }
+  };
+
+  // Next Delivery Data - now as state to allow updates
+  const [nextDelivery, setNextDelivery] = useState({
     order_id: "ORD-20251003-001",
     project: "Housing Project A",
     location: "123 Main Street, Cape Town",
@@ -243,15 +286,15 @@ const SiteAgentDashboard = () => {
     driver: "Mike Johnson",
     driver_phone: "+27 82 123 4567",
     eta: "10:30 AM"
-  };
+  });
 
   // Order Timeline
-  const deliveryTimeline = [
+  const [deliveryTimeline, setDeliveryTimeline] = useState([
     { time: "06:00", event: "Batching Started", completed: true, description: "Concrete mixing initiated at plant" },
     { time: "07:30", event: "Truck Dispatched", completed: true, description: "TRK-002 departed from plant" },
     { time: "08:45", event: "En Route", completed: true, description: "Truck is 15km from site" },
     { time: "10:30", event: "On Site Delivery", completed: false, description: "Expected arrival time" }
-  ];
+  ]);
 
   // Order History
   const orderHistory = [
@@ -385,7 +428,7 @@ const SiteAgentDashboard = () => {
               <Select value={selectedArea} onValueChange={(value) => {
                 setSelectedArea(value);
                 setSelectedStructure('');
-                setQuickOrderData({ ...quickOrderData, area: value, structure: '' });
+                setQuickOrderData({ ...quickOrderData, area: value, structure: '', selectedAgent: '' });
               }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose project area" />
@@ -429,6 +472,58 @@ const SiteAgentDashboard = () => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          {/* Agent Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="agent">Ordering Agent</Label>
+              <Select 
+                value={quickOrderData.selectedAgent} 
+                onValueChange={(value) => setQuickOrderData({ ...quickOrderData, selectedAgent: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select ordering agent" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableAgents
+                    .filter(agent => agent.status === 'Active')
+                    .map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{agent.name}</span>
+                          <span className="text-xs text-muted-foreground">{agent.company}</span>
+                        </div>
+                        <Badge variant="outline" className="ml-2 text-xs">{agent.site}</Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm text-muted-foreground">Agent Details</Label>
+              {quickOrderData.selectedAgent ? (
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                  {(() => {
+                    const selectedAgent = availableAgents.find(a => a.id === quickOrderData.selectedAgent);
+                    return selectedAgent ? (
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-blue-800">{selectedAgent.name}</p>
+                        <p className="text-xs text-blue-600">{selectedAgent.phone}</p>
+                        <p className="text-xs text-blue-600">{selectedAgent.email}</p>
+                        <Badge className="text-xs bg-blue-600 text-white">{selectedAgent.site}</Badge>
+                      </div>
+                    ) : null;
+                  })()} 
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                  <p className="text-sm text-gray-500">No agent selected</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -727,7 +822,9 @@ const SiteAgentDashboard = () => {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Status</p>
-              <Badge className="bg-primary">{nextDelivery.status}</Badge>
+              <Badge className={nextDelivery.status === 'On Site' ? 'bg-green-600' : 'bg-primary'}>
+                {nextDelivery.status}
+              </Badge>
             </div>
           </div>
           <div className="flex items-center justify-between pt-2 border-t">
@@ -773,9 +870,15 @@ const SiteAgentDashboard = () => {
               <Navigation className="w-4 h-4 mr-2" />
               Track Truck
             </Button>
-            <Button size="sm" variant="outline" className="flex-1">
+            <Button 
+              size="sm" 
+              variant={deliveryTimeline.find(item => item.event === 'On Site Delivery')?.completed ? "default" : "outline"} 
+              className="flex-1" 
+              onClick={handleConfirmArrival}
+              disabled={deliveryTimeline.find(item => item.event === 'On Site Delivery')?.completed}
+            >
               <CheckCircle className="w-4 h-4 mr-2" />
-              Confirm Arrival
+              {deliveryTimeline.find(item => item.event === 'On Site Delivery')?.completed ? 'Arrival Confirmed' : 'Confirm Arrival'}
             </Button>
           </div>
         </CardContent>
@@ -1104,11 +1207,11 @@ const SiteAgentDashboard = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Button className="w-full bg-green-600 hover:bg-green-700">
+            <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => navigate('/deliveries')}>
               <CheckCircle className="w-4 h-4 mr-2" />
-              Confirm Delivery
+              Delivery Management
             </Button>
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full" onClick={() => navigate('/issues')}>
               <AlertTriangle className="w-4 h-4 mr-2" />
               Report Issue
             </Button>
