@@ -122,3 +122,61 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile optimizations */
+@layer utilities {
+  /* Touch-friendly button sizes */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  
+  /* Mobile-first responsive containers */
+  .mobile-container {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* Site Agent specific mobile styles */
+  .site-agent-mobile {
+    @apply space-y-3 md:space-y-6;
+  }
+  
+  .site-agent-mobile .card {
+    @apply mx-2 md:mx-0;
+  }
+  
+  /* Mobile-friendly grid layouts */
+  .mobile-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6;
+  }
+  
+  /* Mobile-optimized buttons */
+  .mobile-btn {
+    @apply h-12 text-base touch-target;
+  }
+  
+  /* Mobile-friendly cards */
+  .mobile-card {
+    @apply p-4 md:p-6;
+  }
+  
+  /* Mobile navigation */
+  .mobile-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-background border-t border-border p-2;
+  }
+  
+  /* Mobile-specific spacing */
+  .mobile-spacing {
+    @apply space-y-4 md:space-y-6;
+  }
+  
+  /* Mobile-friendly forms */
+  .mobile-form {
+    @apply space-y-4;
+  }
+  
+  .mobile-form input,
+  .mobile-form select,
+  .mobile-form textarea {
+    @apply h-12 text-base;
+  }
+}

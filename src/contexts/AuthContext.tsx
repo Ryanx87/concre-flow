@@ -1,18 +1,23 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { UserRole } from '@/hooks/useUserRole';
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: { id: string; email: string; role: UserRole } | null;
+  role: UserRole | null;
   loading: boolean;
+  theme: 'admin' | 'site_agent' | 'default';
+  login: (role: UserRole) => void;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  session: null,
+  role: null,
   loading: true,
+  theme: 'default',
+  login: () => {},
+  logout: () => {},
 });
 
 export const useAuth = () => {
@@ -24,40 +29,66 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<{ id: string; email: string; role: UserRole } | null>(null);
+  const [role, setRole] = useState<UserRole | null>(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Determine theme based on role
+  const theme = role === 'admin' ? 'admin' : role === 'site_agent' ? 'site_agent' : 'default';
+
+  // Login function - creates a mock user with the selected role
+  const login = (selectedRole: UserRole) => {
+    const mockUser = {
+      id: `mock-${selectedRole}-${Date.now()}`,
+      email: `${selectedRole}@concretek.com`,
+      role: selectedRole
+    };
+    
+    setUser(mockUser);
+    setRole(selectedRole);
+    
+    // Store in localStorage for persistence
+    localStorage.setItem('concretek_user', JSON.stringify(mockUser));
+    localStorage.setItem('concretek_role', selectedRole);
+    
+    navigate('/dashboard');
+  };
+
+  // Logout function
+  const logout = () => {
+    setUser(null);
+    setRole(null);
+    
+    // Clear localStorage
+    localStorage.removeItem('concretek_user');
+    localStorage.removeItem('concretek_role');
+    
+    navigate('/auth');
+  };
+
+  // Check for existing session on mount
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-
-        // Redirect on auth state changes
-        if (event === 'SIGNED_IN') {
-          navigate('/dashboard');
-        } else if (event === 'SIGNED_OUT') {
-          navigate('/auth');
-        }
+    const storedUser = localStorage.getItem('concretek_user');
+    const storedRole = localStorage.getItem('concretek_role') as UserRole;
+    
+    if (storedUser && storedRole) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        setRole(storedRole);
+      } catch (error) {
+        console.error('Error parsing stored user:', error);
+        localStorage.removeItem('concretek_user');
+        localStorage.removeItem('concretek_role');
       }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    }
+    
+    setLoading(false);
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading }}>
+    <AuthContext.Provider value={{ user, role, loading, theme, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
