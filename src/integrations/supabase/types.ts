@@ -149,6 +149,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          client: string | null
           company_id: string
           concrete_grade: Database["public"]["Enums"]["concrete_grade"]
           created_at: string
@@ -156,8 +157,12 @@ export type Database = {
           delivery_time: string | null
           estimated_price: number | null
           id: string
+          mix_design: string | null
           number_of_trucks: number
           order_number: string
+          project_name: string | null
+          site_contact_name: string | null
+          site_contact_phone: string | null
           site_id: string
           slump: number | null
           special_instructions: string | null
@@ -167,6 +172,7 @@ export type Database = {
           volume: number
         }
         Insert: {
+          client?: string | null
           company_id: string
           concrete_grade: Database["public"]["Enums"]["concrete_grade"]
           created_at?: string
@@ -174,8 +180,12 @@ export type Database = {
           delivery_time?: string | null
           estimated_price?: number | null
           id?: string
+          mix_design?: string | null
           number_of_trucks: number
           order_number: string
+          project_name?: string | null
+          site_contact_name?: string | null
+          site_contact_phone?: string | null
           site_id: string
           slump?: number | null
           special_instructions?: string | null
@@ -185,6 +195,7 @@ export type Database = {
           volume: number
         }
         Update: {
+          client?: string | null
           company_id?: string
           concrete_grade?: Database["public"]["Enums"]["concrete_grade"]
           created_at?: string
@@ -192,8 +203,12 @@ export type Database = {
           delivery_time?: string | null
           estimated_price?: number | null
           id?: string
+          mix_design?: string | null
           number_of_trucks?: number
           order_number?: string
+          project_name?: string | null
+          site_contact_name?: string | null
+          site_contact_phone?: string | null
           site_id?: string
           slump?: number | null
           special_instructions?: string | null
@@ -409,24 +424,22 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "manager" | "user"
+      app_role: "admin" | "site_agent"
       concrete_grade: "20MPa" | "25MPa" | "30MPa" | "40MPa" | "50MPa"
       notification_type:
-        | "order_confirmed"
+        | "order_approved"
         | "truck_dispatched"
-        | "delivery_approaching"
         | "delivery_arrived"
-        | "delivery_completed"
-        | "status_changed"
+        | "delivery_confirmed"
+        | "order_rejected"
+        | "order_pending"
       order_status:
-        | "placed"
-        | "confirmed"
-        | "in-production"
+        | "pending_approval"
+        | "approved"
+        | "in_production"
         | "dispatched"
-        | "in-transit"
         | "delivered"
-        | "completed"
-        | "cancelled"
+        | "rejected"
       structure_type:
         | "foundation"
         | "column"
@@ -561,25 +574,23 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "user"],
+      app_role: ["admin", "site_agent"],
       concrete_grade: ["20MPa", "25MPa", "30MPa", "40MPa", "50MPa"],
       notification_type: [
-        "order_confirmed",
+        "order_approved",
         "truck_dispatched",
-        "delivery_approaching",
         "delivery_arrived",
-        "delivery_completed",
-        "status_changed",
+        "delivery_confirmed",
+        "order_rejected",
+        "order_pending",
       ],
       order_status: [
-        "placed",
-        "confirmed",
-        "in-production",
+        "pending_approval",
+        "approved",
+        "in_production",
         "dispatched",
-        "in-transit",
         "delivered",
-        "completed",
-        "cancelled",
+        "rejected",
       ],
       structure_type: [
         "foundation",
