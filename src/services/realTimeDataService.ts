@@ -437,8 +437,18 @@ class RealTimeDataService {
   }
 
   // User Management
-  setCurrentUser(userId: string, role: 'admin' | 'site-agent', name: string) {
-    this.currentUser = { id: userId, role, name };
+  setCurrentUser(userId: string, role: 'admin' | 'site-agent', name: string, agentInfo?: {
+    site?: string;
+    company?: string;
+    phone?: string;
+    email?: string;
+  }) {
+    this.currentUser = { 
+      id: userId, 
+      role, 
+      name,
+      ...agentInfo
+    };
   }
 
   getCurrentUser() {

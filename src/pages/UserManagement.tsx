@@ -20,14 +20,15 @@ import {
   MapPin,
   Settings,
   CheckCircle,
-  XCircle
+  XCircle,
+  UserCheck
 } from 'lucide-react';
 
 const UserManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [dialogType, setDialogType] = useState<'truck' | 'driver' | 'supplier'>('truck');
+  const [dialogType, setDialogType] = useState<'truck' | 'driver' | 'supplier' | 'agent'>('truck');
   const [editingItem, setEditingItem] = useState<any>(null);
 
   // Mock data
@@ -52,6 +53,13 @@ const UserManagement = () => {
     { id: 'SUP-004', name: 'Steel Fiber Solutions', contact: 'Mark Davis', phone: '+27 89 890 1234', email: 'orders@steelfiber.co.za', category: 'Fibers', status: 'Active' }
   ]);
 
+  const [agents, setAgents] = useState([
+    { id: 'AGT-001', name: 'Alex Johnson', phone: '+27 82 111 2222', email: 'alex@constructionsite.co.za', site: 'Housing Project A', company: 'BuildRight Construction', status: 'Active', lastOrder: '2024-10-01' },
+    { id: 'AGT-002', name: 'Maria Santos', phone: '+27 83 333 4444', email: 'maria@commercialdev.co.za', site: 'Commercial Complex', company: 'Commercial Developers', status: 'Active', lastOrder: '2024-09-28' },
+    { id: 'AGT-003', name: 'James Brown', phone: '+27 84 555 6666', email: 'james@bridgeworks.co.za', site: 'Bridge Construction', company: 'Bridge Works Ltd', status: 'Inactive', lastOrder: '2024-09-15' },
+    { id: 'AGT-004', name: 'Sarah Wilson', phone: '+27 85 777 8888', email: 'sarah@roadbuilders.co.za', site: 'Road Extension', company: 'Road Builders Inc', status: 'Active', lastOrder: '2024-10-02' }
+  ]);
+
   const getStatusBadge = (status: string) => {
     const colors = {
       'Available': 'bg-green-100 text-green-800',
@@ -64,19 +72,19 @@ const UserManagement = () => {
     return <Badge className={colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800'}>{status}</Badge>;
   };
 
-  const handleAdd = (type: 'truck' | 'driver' | 'supplier') => {
+  const handleAdd = (type: 'truck' | 'driver' | 'supplier' | 'agent') => {
     setDialogType(type);
     setEditingItem(null);
     setShowAddDialog(true);
   };
 
-  const handleEdit = (type: 'truck' | 'driver' | 'supplier', item: any) => {
+  const handleEdit = (type: 'truck' | 'driver' | 'supplier' | 'agent', item: any) => {
     setDialogType(type);
     setEditingItem(item);
     setShowAddDialog(true);
   };
 
-  const handleDelete = (type: 'truck' | 'driver' | 'supplier', id: string) => {
+  const handleDelete = (type: 'truck' | 'driver' | 'supplier' | 'agent', id: string) => {
     if (confirm('Are you sure you want to delete this item?')) {
       switch (type) {
         case 'truck':
@@ -87,6 +95,9 @@ const UserManagement = () => {
           break;
         case 'supplier':
           setSuppliers(prev => prev.filter(item => item.id !== id));
+          break;
+        case 'agent':
+          setAgents(prev => prev.filter(item => item.id !== id));
           break;
       }
     }
@@ -110,6 +121,9 @@ const UserManagement = () => {
           case 'supplier':
             setSuppliers(prev => prev.map(item => item.id === editingItem.id ? { ...formData } : item));
             break;
+          case 'agent':
+            setAgents(prev => prev.map(item => item.id === editingItem.id ? { ...formData } : item));
+            break;
         }
       } else {
         // Add new item
@@ -125,6 +139,9 @@ const UserManagement = () => {
             break;
           case 'supplier':
             setSuppliers(prev => [...prev, newItem]);
+            break;
+          case 'agent':
+            setAgents(prev => [...prev, newItem]);
             break;
         }
       }
@@ -307,6 +324,70 @@ const UserManagement = () => {
             </div>
           );
         
+        case 'agent':
+          return (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="name">Full Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name || ''}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Alex Johnson"
+                />
+              </div>
+              <div>
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone || ''}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="+27 82 111 2222"
+                />
+              </div>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email || ''}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="agent@site.co.za"
+                />
+              </div>
+              <div>
+                <Label htmlFor="site">Site/Project</Label>
+                <Input
+                  id="site"
+                  value={formData.site || ''}
+                  onChange={(e) => setFormData({ ...formData, site: e.target.value })}
+                  placeholder="Housing Project A"
+                />
+              </div>
+              <div>
+                <Label htmlFor="company">Company</Label>
+                <Input
+                  id="company"
+                  value={formData.company || ''}
+                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                  placeholder="BuildRight Construction"
+                />
+              </div>
+              <div>
+                <Label htmlFor="status">Status</Label>
+                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          );
+        
         default:
           return null;
       }
@@ -343,7 +424,7 @@ const UserManagement = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
           <p className="text-muted-foreground">
-            Manage trucks, drivers, and suppliers
+            Manage trucks, drivers, suppliers, and site agents
           </p>
         </div>
       </div>
@@ -372,13 +453,14 @@ const UserManagement = () => {
             <SelectItem value="On Route">On Route</SelectItem>
             <SelectItem value="Maintenance">Maintenance</SelectItem>
             <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Inactive">Inactive</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="trucks" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="trucks" className="flex items-center gap-2">
             <Truck className="w-4 h-4" />
             Trucks
@@ -390,6 +472,10 @@ const UserManagement = () => {
           <TabsTrigger value="suppliers" className="flex items-center gap-2">
             <Building className="w-4 h-4" />
             Suppliers
+          </TabsTrigger>
+          <TabsTrigger value="agents" className="flex items-center gap-2">
+            <UserCheck className="w-4 h-4" />
+            Site Agents
           </TabsTrigger>
         </TabsList>
 
@@ -569,6 +655,78 @@ const UserManagement = () => {
                             <Edit className="w-3 h-3" />
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => handleDelete('supplier', supplier.id)}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Site Agents Tab */}
+        <TabsContent value="agents">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Site Agent Management</CardTitle>
+                <Button onClick={() => handleAdd('agent')}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Site Agent
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Agent ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Site/Project</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {agents
+                    .filter(agent => 
+                      (selectedStatus === 'all' || agent.status === selectedStatus) &&
+                      (agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       agent.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       agent.site.toLowerCase().includes(searchTerm.toLowerCase()))
+                    )
+                    .map((agent) => (
+                    <TableRow key={agent.id}>
+                      <TableCell className="font-medium">{agent.id}</TableCell>
+                      <TableCell>{agent.name}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="text-sm font-medium flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-muted-foreground" />
+                            {agent.phone}
+                          </p>
+                          <p className="text-sm text-muted-foreground">{agent.email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-muted-foreground" />
+                          {agent.site}
+                        </div>
+                      </TableCell>
+                      <TableCell>{agent.company}</TableCell>
+                      <TableCell>{getStatusBadge(agent.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleEdit('agent', agent)}>
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleDelete('agent', agent.id)}>
                             <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>

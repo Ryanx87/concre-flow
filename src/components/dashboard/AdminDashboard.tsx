@@ -3,7 +3,6 @@ import { Building2, Package, Truck, Activity, AlertTriangle, BarChart3, Users, D
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
@@ -428,7 +427,7 @@ const AdminDashboard = () => {
                 <TabsTrigger value="dispatched">Dispatched</TabsTrigger>
               </TabsList>
               <TabsContent value="pending" className="space-y-3">
-                {orders.filter(o => o.status === 'Pending').map((order) => (
+                {staticOrders.filter(o => o.status === 'Pending').map((order) => (
                   <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -455,7 +454,7 @@ const AdminDashboard = () => {
                 ))}
               </TabsContent>
               <TabsContent value="approved" className="space-y-3">
-                {orders.filter(o => o.status === 'Approved').map((order) => (
+                {staticOrders.filter(o => o.status === 'Approved').map((order) => (
                   <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -473,7 +472,7 @@ const AdminDashboard = () => {
                 ))}
               </TabsContent>
               <TabsContent value="production" className="space-y-3">
-                {orders.filter(o => o.status === 'In Production').map((order) => (
+                {staticOrders.filter(o => o.status === 'In Production').map((order) => (
                   <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -491,7 +490,7 @@ const AdminDashboard = () => {
                 ))}
               </TabsContent>
               <TabsContent value="dispatched" className="space-y-3">
-                {orders.filter(o => o.status === 'Dispatched').map((order) => (
+                {staticOrders.filter(o => o.status === 'Dispatched').map((order) => (
                   <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
