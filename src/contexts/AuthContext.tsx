@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserRole } from '@/hooks/useUserRole';
+
+export type UserRole = 'admin' | 'site_agent' | null;
 
 interface AuthContextType {
   user: { id: string; email: string; role: UserRole } | null;

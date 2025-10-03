@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PackageCheck, Clock, MapPin, Calendar, Cloud, Plus, Camera, Phone, Navigation, Thermometer, Wind, Settings, CheckCircle, AlertTriangle, FileText, Download, Eye, Truck, User, CalendarDays, History, BarChart3 } from 'lucide-react';
+import { PackageCheck, Clock, MapPin, Calendar, Cloud, Plus, Camera, Phone, Navigation, Thermometer, Wind, Settings, CheckCircle, AlertTriangle, FileText, Download, Eye, Truck, User, CalendarDays, History, BarChart3, Building, ShoppingCart, Layers, Edit, Trash2, Save, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,17 +8,226 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useState, useEffect } from 'react';
 import { weatherService, WeatherData } from '@/services/weatherService';
+import { realTimeDataService, ProjectArea, Structure } from '@/services/realTimeDataService';
 import { WeatherSettings } from '@/components/settings/WeatherSettings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
+import { RealTimeSyncPanel } from './RealTimeSyncPanel';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useNavigate } from 'react-router-dom';
 
 const SiteAgentDashboard = () => {
+  const navigate = useNavigate();
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [showWeatherSettings, setShowWeatherSettings] = useState(false);
+  const [selectedArea, setSelectedArea] = useState('');
+  const [selectedStructure, setSelectedStructure] = useState('');
   const [showOrderForm, setShowOrderForm] = useState(false);
+  const [showAreaManagement, setShowAreaManagement] = useState(false);
+  const [editingArea, setEditingArea] = useState<string | null>(null);
+  const [editingStructure, setEditingStructure] = useState<string | null>(null);
+  const [newAreaData, setNewAreaData] = useState({ name: '', progress: 0 });
+  const [newStructureData, setNewStructureData] = useState({ name: '', type: 'Foundation', recommendedGrade: '25MPa' });
+  const [quickOrderData, setQuickOrderData] = useState({
+    area: '',
+    structure: '',
+    volume: '',
+    grade: '25MPa',
+    deliveryDate: '',
+    deliveryTime: '08:00'
+  });
+
+  // Project Areas and Structures - now as state
+  const [projectAreas, setProjectAreas] = useState<ProjectArea[]>([]);
+  const [lastSync, setLastSync] = useState<string>('');
+  const [syncStatus, setSyncStatus] = useState<'connected' | 'syncing' | 'disconnected'>('connected');
+
+  // Area and Structure Management Functions
+  const addNewArea = () => {
+    if (!newAreaData.name.trim()) {
+      alert('Please enter an area name');
+      return;
+    }
+    
+    setSyncStatus('syncing');
+    try {
+      const newArea = realTimeDataService.addArea(newAreaData.name, newAreaData.progress);
+      setNewAreaData({ name: '', progress: 0 });
+      setSyncStatus('connected');
+      setLastSync(new Date().toLocaleTimeString());
+    } catch (error) {
+      console.error('Failed to add area:', error);
+      setSyncStatus('disconnected');
+      alert('Failed to add area. Please try again.');
+    }
+  };
+
+  const removeArea = (areaId: string) => {
+    if (confirm('Are you sure you want to remove this area and all its structures?')) {
+      setSyncStatus('syncing');
+      try {
+        const success = realTimeDataService.removeArea(areaId);
+        if (success) {
+          if (selectedArea === areaId) {
+            setSelectedArea('');
+            setSelectedStructure('');
+          }
+          setSyncStatus('connected');
+          setLastSync(new Date().toLocaleTimeString());
+        } else {
+          throw new Error('Failed to remove area');
+        }
+      } catch (error) {
+        console.error('Failed to remove area:', error);
+        setSyncStatus('disconnected');
+        alert('Failed to remove area. Please try again.');
+      }
+    }
+  };
+
+  const updateAreaProgress = (areaId: string, progress: number) => {
+    setSyncStatus('syncing');
+    try {
+      const success = realTimeDataService.updateAreaProgress(areaId, progress);
+      if (success) {
+        setSyncStatus('connected');
+        setLastSync(new Date().toLocaleTimeString());
+      } else {
+        throw new Error('Failed to update progress');
+      }
+    } catch (error) {
+      console.error('Failed to update progress:', error);
+      setSyncStatus('disconnected');
+      alert('Failed to update progress. Please try again.');
+    }
+  };
+
+  const addStructureToArea = (areaId: string) => {
+    if (!newStructureData.name.trim()) {
+      alert('Please enter a structure name');
+      return;
+    }
+    
+    setSyncStatus('syncing');
+    try {
+      const newStructure = realTimeDataService.addStructureToArea(
+        areaId, 
+        newStructureData.name, 
+        newStructureData.type as Structure['type'], 
+        newStructureData.recommendedGrade
+      );
+      
+      if (newStructure) {
+        setNewStructureData({ name: '', type: 'Foundation', recommendedGrade: '25MPa' });
+        setSyncStatus('connected');
+        setLastSync(new Date().toLocaleTimeString());
+      } else {
+        throw new Error('Failed to add structure');
+      }
+    } catch (error) {
+      console.error('Failed to add structure:', error);
+      setSyncStatus('disconnected');
+      alert('Failed to add structure. Please try again.');
+    }
+  };
+
+  const removeStructure = (areaId: string, structureId: string) => {
+    if (confirm('Are you sure you want to remove this structure?')) {
+      setSyncStatus('syncing');
+      try {
+        const success = realTimeDataService.removeStructure(areaId, structureId);
+        if (success) {
+          if (selectedStructure === structureId) {
+            setSelectedStructure('');
+          }
+          setSyncStatus('connected');
+          setLastSync(new Date().toLocaleTimeString());
+        } else {
+          throw new Error('Failed to remove structure');
+        }
+      } catch (error) {
+        console.error('Failed to remove structure:', error);
+        setSyncStatus('disconnected');
+        alert('Failed to remove structure. Please try again.');
+      }
+    }
+  };
+
+  const getSelectedStructures = () => {
+    const area = projectAreas.find(a => a.id === selectedArea);
+    return area ? area.structures : [];
+  };
+
+  const getRecommendedGrade = () => {
+    const structures = getSelectedStructures();
+    const structure = structures.find(s => s.id === selectedStructure);
+    return structure ? structure.recommendedGrade : '25MPa';
+  };
+
+  const handleQuickOrder = () => {
+    if (!quickOrderData.area || !quickOrderData.structure || !quickOrderData.volume) {
+      alert('Please fill in all required fields for quick order');
+      return;
+    }
+    
+    setSyncStatus('syncing');
+    try {
+      // Create order using real-time service
+      const orderData = {
+        projectName: 'Quick Order',
+        location: 'Site Location',
+        areaId: quickOrderData.area,
+        structureId: quickOrderData.structure,
+        volume: parseFloat(quickOrderData.volume),
+        grade: quickOrderData.grade,
+        slump: 100,
+        deliveryDate: quickOrderData.deliveryDate,
+        deliveryTime: quickOrderData.deliveryTime,
+        status: 'Pending' as const,
+        contactName: 'Site Agent',
+        contactPhone: '+27 82 123 4567',
+        specialInstructions: 'Quick order from site agent'
+      };
+      
+      const newOrder = realTimeDataService.createOrder(orderData);
+      setSyncStatus('connected');
+      setLastSync(new Date().toLocaleTimeString());
+      
+      alert(`Quick order submitted for ${quickOrderData.volume}m³ of ${quickOrderData.grade} concrete (Order ID: ${newOrder.id})`);
+      
+      // Reset form
+      setQuickOrderData({
+        area: '',
+        structure: '',
+        volume: '',
+        grade: '25MPa',
+        deliveryDate: '',
+        deliveryTime: '08:00'
+      });
+      setSelectedArea('');
+      setSelectedStructure('');
+    } catch (error) {
+      console.error('Failed to create order:', error);
+      setSyncStatus('disconnected');
+      alert('Failed to submit order. Please try again.');
+    }
+  };
+
+  const handleCallDriver = (phone: string, driverName: string) => {
+    const confirmed = confirm(`Call ${driverName} at ${phone}?`);
+    if (confirmed) {
+      window.open(`tel:${phone}`, '_self');
+    }
+  };
+
+  const handleEmergencyCall = (contact: { name: string; phone: string; role: string }) => {
+    const confirmed = confirm(`Call ${contact.name} (${contact.role}) at ${contact.phone}?`);
+    if (confirmed) {
+      window.open(`tel:${contact.phone}`, '_self');
+    }
+  };
 
   // Next Delivery Data
   const nextDelivery = {
@@ -67,6 +276,44 @@ const SiteAgentDashboard = () => {
     on_time_delivery: 92.5
   };
 
+  // Load data and set up real-time sync
+  useEffect(() => {
+    // Initialize real-time data service
+    realTimeDataService.setCurrentUser('site-agent-1', 'site-agent', 'Site Agent');
+    
+    // Load initial data
+    setProjectAreas(realTimeDataService.getProjectAreas());
+    setLastSync(new Date().toLocaleTimeString());
+    
+    // Subscribe to real-time updates
+    const unsubscribeAreas = realTimeDataService.subscribe('projectAreas', (data, action) => {
+      if (action === 'create' || action === 'update') {
+        setProjectAreas(realTimeDataService.getProjectAreas());
+        setLastSync(new Date().toLocaleTimeString());
+      } else if (action === 'delete') {
+        setProjectAreas(realTimeDataService.getProjectAreas());
+        setLastSync(new Date().toLocaleTimeString());
+      }
+    });
+
+    const unsubscribeOrders = realTimeDataService.subscribe('orders', (data, action) => {
+      // Handle order updates if needed
+      setLastSync(new Date().toLocaleTimeString());
+    });
+
+    const unsubscribeActivities = realTimeDataService.subscribe('activities', (data, action) => {
+      // Handle activity updates if needed
+      setLastSync(new Date().toLocaleTimeString());
+    });
+
+    // Cleanup subscriptions
+    return () => {
+      unsubscribeAreas();
+      unsubscribeOrders();
+      unsubscribeActivities();
+    };
+  }, []);
+
   // Load weather data on component mount
   useEffect(() => {
     const loadWeatherData = async () => {
@@ -104,6 +351,348 @@ const SiteAgentDashboard = () => {
 
   return (
     <div className="site-agent-mobile">
+      {/* Priority Concrete Ordering Section */}
+      <Card className="border-2 border-green-600 bg-green-50">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5 text-green-600" />
+              <span className="text-green-800">Quick Order Concrete</span>
+              <div className="flex items-center gap-1 ml-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  syncStatus === 'connected' ? 'bg-green-500' : 
+                  syncStatus === 'syncing' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
+                }`} />
+                <span className="text-xs text-gray-600">
+                  {syncStatus === 'connected' ? 'Live' : 
+                   syncStatus === 'syncing' ? 'Syncing...' : 'Offline'}
+                </span>
+              </div>
+            </div>
+            <Badge className="bg-green-600 text-white">Priority</Badge>
+            {lastSync && (
+              <Badge variant="outline" className="text-xs">
+                Last sync: {lastSync}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Area Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="area">Select Area</Label>
+              <Select value={selectedArea} onValueChange={(value) => {
+                setSelectedArea(value);
+                setSelectedStructure('');
+                setQuickOrderData({ ...quickOrderData, area: value, structure: '' });
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose project area" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectAreas.map((area) => (
+                    <SelectItem key={area.id} value={area.id}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{area.name}</span>
+                        <Badge variant="outline" className="ml-2">{area.progress}%</Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Structure Selection */}
+            <div>
+              <Label htmlFor="structure">Select Structure</Label>
+              <Select 
+                value={selectedStructure} 
+                onValueChange={(value) => {
+                  setSelectedStructure(value);
+                  const recommendedGrade = getRecommendedGrade();
+                  setQuickOrderData({ ...quickOrderData, structure: value, grade: recommendedGrade });
+                }}
+                disabled={!selectedArea}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedArea ? "Choose structure" : "Select area first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {getSelectedStructures().map((structure) => (
+                    <SelectItem key={structure.id} value={structure.id}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{structure.name}</span>
+                        <Badge variant="outline" className="ml-2">{structure.recommendedGrade}</Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Quick Order Details */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="volume">Volume (m³)</Label>
+              <Input 
+                id="volume" 
+                type="number" 
+                placeholder="25" 
+                value={quickOrderData.volume}
+                onChange={(e) => setQuickOrderData({ ...quickOrderData, volume: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="grade">Concrete Grade</Label>
+              <Select 
+                value={quickOrderData.grade} 
+                onValueChange={(value) => setQuickOrderData({ ...quickOrderData, grade: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10MPa">10MPa - Mass Concrete</SelectItem>
+                  <SelectItem value="15MPa">15MPa - Blinding</SelectItem>
+                  <SelectItem value="20MPa">20MPa - General</SelectItem>
+                  <SelectItem value="25MPa">25MPa - Foundation</SelectItem>
+                  <SelectItem value="30MPa">30MPa - Structural</SelectItem>
+                  <SelectItem value="35MPa">35MPa - High Strength</SelectItem>
+                  <SelectItem value="40MPa">40MPa - Premium</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="delivery_date">Delivery Date</Label>
+              <Input 
+                id="delivery_date" 
+                type="date" 
+                value={quickOrderData.deliveryDate}
+                onChange={(e) => setQuickOrderData({ ...quickOrderData, deliveryDate: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="delivery_time">Time</Label>
+              <Select 
+                value={quickOrderData.deliveryTime} 
+                onValueChange={(value) => setQuickOrderData({ ...quickOrderData, deliveryTime: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="06:00">06:00 AM</SelectItem>
+                  <SelectItem value="08:00">08:00 AM</SelectItem>
+                  <SelectItem value="10:00">10:00 AM</SelectItem>
+                  <SelectItem value="12:00">12:00 PM</SelectItem>
+                  <SelectItem value="14:00">02:00 PM</SelectItem>
+                  <SelectItem value="16:00">04:00 PM</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="flex gap-2">
+            <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleQuickOrder}>
+              <Plus className="w-4 h-4 mr-2" />
+              Quick Order
+            </Button>
+            <Dialog open={showOrderForm} onOpenChange={setShowOrderForm}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="flex-1">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Advanced Order
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Advanced Order Form</DialogTitle>
+                </DialogHeader>
+                {/* Advanced order form content */}
+              </DialogContent>
+            </Dialog>
+            <Dialog open={showAreaManagement} onOpenChange={setShowAreaManagement}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="flex-1">
+                  <Edit className="w-4 h-4 mr-2" />
+                  Manage Areas
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Manage Project Areas & Structures</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-6">
+                  {/* Add New Area */}
+                  <div className="border rounded-lg p-4 bg-blue-50">
+                    <h3 className="font-medium mb-3 text-blue-800">Add New Area</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="new_area_name">Area Name</Label>
+                        <Input 
+                          id="new_area_name" 
+                          placeholder="e.g., Foundation Zone D" 
+                          value={newAreaData.name}
+                          onChange={(e) => setNewAreaData({ ...newAreaData, name: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new_area_progress">Progress (%)</Label>
+                        <Input 
+                          id="new_area_progress" 
+                          type="number" 
+                          min="0" 
+                          max="100" 
+                          placeholder="0" 
+                          value={newAreaData.progress}
+                          onChange={(e) => setNewAreaData({ ...newAreaData, progress: parseInt(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button onClick={addNewArea} className="w-full">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Area
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Existing Areas */}
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-gray-800">Existing Areas</h3>
+                    {projectAreas.map((area) => (
+                      <div key={area.id} className="border rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium">{area.name}</h4>
+                            <Badge variant="outline">{area.progress}% Complete</Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={area.progress}
+                              onChange={(e) => updateAreaProgress(area.id, parseInt(e.target.value) || 0)}
+                              className="w-20 h-8"
+                            />
+                            <Button 
+                              size="sm" 
+                              variant="destructive" 
+                              onClick={() => removeArea(area.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Add Structure to Area */}
+                        <div className="border rounded p-3 bg-white mb-3">
+                          <h5 className="text-sm font-medium mb-2">Add Structure to {area.name}</h5>
+                          <div className="grid grid-cols-4 gap-2">
+                            <Input
+                              placeholder="Structure name"
+                              value={newStructureData.name}
+                              onChange={(e) => setNewStructureData({ ...newStructureData, name: e.target.value })}
+                            />
+                            <Select 
+                              value={newStructureData.type} 
+                              onValueChange={(value) => setNewStructureData({ ...newStructureData, type: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Foundation">Foundation</SelectItem>
+                                <SelectItem value="Structural">Structural</SelectItem>
+                                <SelectItem value="Paving">Paving</SelectItem>
+                                <SelectItem value="General">General</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select 
+                              value={newStructureData.recommendedGrade} 
+                              onValueChange={(value) => setNewStructureData({ ...newStructureData, recommendedGrade: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="15MPa">15MPa</SelectItem>
+                                <SelectItem value="20MPa">20MPa</SelectItem>
+                                <SelectItem value="25MPa">25MPa</SelectItem>
+                                <SelectItem value="30MPa">30MPa</SelectItem>
+                                <SelectItem value="35MPa">35MPa</SelectItem>
+                                <SelectItem value="40MPa">40MPa</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button 
+                              size="sm" 
+                              onClick={() => addStructureToArea(area.id)}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Existing Structures */}
+                        <div className="space-y-2">
+                          {area.structures.map((structure) => (
+                            <div key={structure.id} className="flex items-center justify-between p-2 bg-white rounded border">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{structure.name}</span>
+                                <Badge variant="outline" className="text-xs">{structure.type}</Badge>
+                                <Badge className="text-xs bg-green-600">{structure.recommendedGrade}</Badge>
+                              </div>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                onClick={() => removeStructure(area.id, structure.id)}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </Button>
+                            </div>
+                          ))}
+                          {area.structures.length === 0 && (
+                            <p className="text-sm text-gray-500 italic p-2">No structures in this area yet.</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="flex justify-end">
+                    <Button variant="outline" onClick={() => setShowAreaManagement(false)}>
+                      <X className="w-4 h-4 mr-2" />
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Area Progress Overview */}
+          {selectedArea && (
+            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+              <h4 className="font-medium text-blue-800 mb-2">Area Progress</h4>
+              <div className="space-y-2">
+                {projectAreas.find(a => a.id === selectedArea)?.structures.map((structure) => (
+                  <div key={structure.id} className="flex items-center justify-between text-sm">
+                    <span>{structure.name}</span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">{structure.type}</Badge>
+                      <Badge className="text-xs bg-blue-600">{structure.recommendedGrade}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       {/* Next Delivery Panel */}
       <Card className="border-2 border-primary">
         <CardHeader>
@@ -146,7 +735,7 @@ const SiteAgentDashboard = () => {
               <Clock className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm">ETA: {nextDelivery.eta}</span>
             </div>
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="outline" onClick={() => handleCallDriver(nextDelivery.driver_phone, nextDelivery.driver)}>
               <Phone className="w-4 h-4 mr-2" />
               Call Driver
             </Button>
@@ -180,7 +769,7 @@ const SiteAgentDashboard = () => {
             ))}
           </div>
           <div className="flex gap-2 mt-4">
-            <Button size="sm" variant="outline" className="flex-1">
+            <Button size="sm" variant="outline" className="flex-1" onClick={() => navigate('/tracking')}>
               <Navigation className="w-4 h-4 mr-2" />
               Track Truck
             </Button>
@@ -214,13 +803,13 @@ const SiteAgentDashboard = () => {
                   <p className="text-sm text-muted-foreground">{order.project}</p>
                   <p className="text-xs text-muted-foreground">{order.date} • {order.quantity_m3}m³ • {order.grade}</p>
                 </div>
-                <Button size="sm" variant="ghost">
+                <Button size="sm" variant="ghost" onClick={() => navigate('/orders')}>
                   <Eye className="w-4 h-4" />
                 </Button>
               </div>
             ))}
           </div>
-          <Button variant="outline" size="sm" className="w-full mt-3">
+          <Button variant="outline" size="sm" className="w-full mt-3" onClick={() => navigate('/orders')}>
             <History className="w-4 h-4 mr-2" />
             View Full History
           </Button>
@@ -253,7 +842,7 @@ const SiteAgentDashboard = () => {
               </div>
               <div className="text-right space-y-1">
                 <p className="font-semibold text-orange-600">{delivery.eta}</p>
-                <Button size="sm" variant="outline">Track</Button>
+                <Button size="sm" variant="outline" onClick={() => navigate('/tracking')}>Track</Button>
               </div>
             </div>
           ))}
@@ -493,6 +1082,10 @@ const SiteAgentDashboard = () => {
               <Download className="w-4 h-4 mr-2" />
               Export Report
             </Button>
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => navigate('/reports')}>
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Analytics
+            </Button>
             <Button variant="outline" size="sm" className="flex-1">
               <FileText className="w-4 h-4 mr-2" />
               View Details
@@ -556,7 +1149,7 @@ const SiteAgentDashboard = () => {
                   <p className="font-medium">{contact.name}</p>
                   <p className="text-sm text-muted-foreground">{contact.role}</p>
                 </div>
-                <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 touch-target">
+                <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 touch-target" onClick={() => handleEmergencyCall(contact)}>
                   <Phone className="w-3 h-3 mr-1" />
                   Call
                 </Button>
@@ -565,6 +1158,13 @@ const SiteAgentDashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Real-Time Sync Panel */}
+      <RealTimeSyncPanel 
+        userRole="site-agent" 
+        userId="site-agent-1" 
+        userName="Site Agent"
+      />
 
       {/* Site Photos */}
       <PhotoUpload 

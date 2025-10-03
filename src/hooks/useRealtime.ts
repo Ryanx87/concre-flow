@@ -95,7 +95,7 @@ export const useRealtimeOrders = () => {
           console.log('Order change received:', payload);
           
           if (payload.eventType === 'INSERT') {
-            const newOrder = payload.new as any;
+            const newOrder = payload.new as Record<string, unknown>;
             setOrders(prev => [{
               id: newOrder.id,
               order_number: newOrder.order_number,
@@ -113,7 +113,7 @@ export const useRealtimeOrders = () => {
               message: `New order placed: ${newOrder.volume}m³ for ${newOrder.delivery_date}`
             }).catch((err: Error) => console.error(err));
           } else if (payload.eventType === 'UPDATE') {
-            const updatedOrder = payload.new as any;
+            const updatedOrder = payload.new as Record<string, unknown>;
             setOrders(prev => prev.map(order => 
               order.id === updatedOrder.id 
                 ? {
@@ -131,7 +131,7 @@ export const useRealtimeOrders = () => {
               message: `Order status changed to: ${updatedOrder.status}`
             }).catch((err: Error) => console.error(err));
           } else if (payload.eventType === 'DELETE') {
-            const deletedOrder = payload.old as any;
+            const deletedOrder = payload.old as Record<string, unknown>;
             setOrders(prev => prev.filter(order => order.id !== deletedOrder.id));
           }
         }
@@ -245,7 +245,7 @@ export const useRealtimeDeliveries = () => {
 
 export const useRealtimeNotifications = () => {
   const { user } = useAuth();
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Record<string, unknown>[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
