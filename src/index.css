@@ -8,8 +8,8 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --background: 0 0% 95%;
+    --foreground: 0 0% 20%;
 
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -17,15 +17,15 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Deep Blue Primary */
-    --primary: 217 91% 35%;
+    /* Primary Blue - #2D9CDB */
+    --primary: 200 63% 52%;
     --primary-foreground: 0 0% 100%;
     
-    /* Royal Blue variant */
-    --primary-light: 217 91% 60%;
+    /* Primary Light variant */
+    --primary-light: 200 63% 65%;
     
-    /* Sky Blue accent */
-    --secondary: 213 94% 68%;
+    /* Secondary Green - #27AE60 */
+    --secondary: 145 63% 42%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 210 40% 96%;
