@@ -1,90 +1,48 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { Button } from '@/components/ui/button';
-import { signOut } from '@/lib/auth';
-import { useToast } from '@/hooks/use-toast';
-import { Truck, LogOut, Loader2 } from 'lucide-react';
-import AdminDashboard from '@/components/dashboard/AdminDashboard';
-import SiteAgentDashboard from '@/components/dashboard/SiteAgentDashboard';
+import AdminDashboard from './AdminDashboard';
+import SiteAgentDashboard from './SiteAgentDashboard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { role, loading: roleLoading } = useUserRole();
-  const { toast } = useToast();
+  const { role, loading } = useUserRole();
 
-  const handleSignOut = async () => {
-    const { error } = await signOut();
-    if (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to sign out',
-      });
-    } else {
-      toast({
-        title: 'Signed Out',
-        description: 'Successfully logged out',
-      });
-    }
-  };
-
-  if (roleLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <Card className="w-96">
+          <CardHeader>
+            <CardTitle>Loading...</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">Checking your permissions...</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
+  if (role === 'admin') {
+    return <AdminDashboard />;
+  }
+
+  if (role === 'site_agent') {
+    return <SiteAgentDashboard />;
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-primary to-primary-light text-white shadow-lg">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-white rounded-full p-2">
-                <Truck className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">Concre-tek</h1>
-                <p className="text-sm text-white/80">by Greenspot Legacy</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm font-medium">{role === 'admin' ? 'Admin' : 'Site Agent'}</p>
-                <p className="text-xs text-white/80">{user?.email}</p>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleSignOut}
-                className="gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign Out
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-foreground mb-2">
-            Welcome back{role === 'admin' ? ', Admin' : ''}!
-          </h2>
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <Card className="w-96">
+        <CardHeader>
+          <CardTitle>Access Denied</CardTitle>
+        </CardHeader>
+        <CardContent>
           <p className="text-muted-foreground">
-            {role === 'admin' ? 'Manage plant operations and approve orders' : 'Track your deliveries and place new orders'}
+            You don't have permission to access the dashboard. Please contact your administrator.
           </p>
-        </div>
-
-        {/* Role-based Dashboard */}
-        {role === 'admin' ? <AdminDashboard /> : <SiteAgentDashboard />}
-      </main>
+        </CardContent>
+      </Card>
     </div>
   );
 };
