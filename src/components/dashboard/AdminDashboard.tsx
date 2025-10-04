@@ -7,8 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { FleetOverview } from './FleetOverview';
+import { RealTimeSyncStatus } from './RealTimeSyncStatus';
 import { useState, useEffect } from 'react';
 import { realTimeDataService, ProjectArea, ConcreteOrder, UserActivity } from '@/services/realTimeDataService';
+import { orderService, OrderStatistics } from '@/services/orderService';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -17,6 +19,7 @@ const AdminDashboard = () => {
   const [projectAreas, setProjectAreas] = useState<ProjectArea[]>([]);
   const [realtimeOrders, setRealtimeOrders] = useState<ConcreteOrder[]>([]);
   const [activities, setActivities] = useState<UserActivity[]>([]);
+  const [orderStats, setOrderStats] = useState<OrderStatistics | null>(null);
   const [lastSync, setLastSync] = useState<string>('');
   const [syncStatus, setSyncStatus] = useState<'connected' | 'syncing' | 'disconnected'>('connected');
 
@@ -26,10 +29,15 @@ const AdminDashboard = () => {
     realTimeDataService.setCurrentUser('admin-1', 'admin', 'Admin User');
     
     // Load initial data
-    setProjectAreas(realTimeDataService.getProjectAreas());
-    setRealtimeOrders(realTimeDataService.getOrders());
-    setActivities(realTimeDataService.getActivities());
-    setLastSync(new Date().toLocaleTimeString());
+    const loadData = async () => {
+      setProjectAreas(realTimeDataService.getProjectAreas());
+      setRealtimeOrders(await orderService.getAllOrders());
+      setActivities(realTimeDataService.getActivities());
+      setOrderStats(await orderService.getOrderStatistics());
+      setLastSync(new Date().toLocaleTimeString());
+    };
+
+    loadData();
     
     // Subscribe to real-time updates
     const unsubscribeAreas = realTimeDataService.subscribe('projectAreas', (data, action) => {
@@ -37,8 +45,9 @@ const AdminDashboard = () => {
       setLastSync(new Date().toLocaleTimeString());
     });
 
-    const unsubscribeOrders = realTimeDataService.subscribe('orders', (data, action) => {
-      setRealtimeOrders(realTimeDataService.getOrders());
+    const unsubscribeOrders = realTimeDataService.subscribe('orders', async (data, action) => {
+      setRealtimeOrders(await orderService.getAllOrders());
+      setOrderStats(await orderService.getOrderStatistics());
       setLastSync(new Date().toLocaleTimeString());
     });
 
@@ -47,10 +56,18 @@ const AdminDashboard = () => {
       setLastSync(new Date().toLocaleTimeString());
     });
 
+    // Subscribe to order service updates
+    const unsubscribeOrderService = orderService.subscribe('orderUpdate', async () => {
+      setRealtimeOrders(await orderService.getAllOrders());
+      setOrderStats(await orderService.getOrderStatistics());
+      setLastSync(new Date().toLocaleTimeString());
+    });
+
     return () => {
       unsubscribeAreas();
       unsubscribeOrders();
       unsubscribeActivities();
+      unsubscribeOrderService();
     };
   }, []);
 
@@ -526,8 +543,15 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Fleet Overview */}
-        <FleetOverview />
+        {/* Real-time Sync Status and Fleet Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1">
+            <RealTimeSyncStatus />
+          </div>
+          <div className="lg:col-span-2">
+            <FleetOverview />
+          </div>
+        </div>
 
         {/* Quality & Compliance */}
         <Card>

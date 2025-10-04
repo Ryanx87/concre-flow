@@ -9,10 +9,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { useState, useEffect } from 'react';
 import { weatherService, WeatherData } from '@/services/weatherService';
 import { realTimeDataService, ProjectArea, Structure } from '@/services/realTimeDataService';
+import { orderService, QuickOrderData } from '@/services/orderService';
 import { WeatherSettings } from '@/components/settings/WeatherSettings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { PhotoUpload } from '@/components/ui/PhotoUpload';
-import { RealTimeSyncPanel } from './RealTimeSyncPanel';
+import { RealTimeSyncStatus } from './RealTimeSyncStatus';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
@@ -30,14 +31,17 @@ const SiteAgentDashboard = () => {
   const [editingStructure, setEditingStructure] = useState<string | null>(null);
   const [newAreaData, setNewAreaData] = useState({ name: '', progress: 0 });
   const [newStructureData, setNewStructureData] = useState({ name: '', type: 'Foundation', recommendedGrade: '25MPa' });
-  const [quickOrderData, setQuickOrderData] = useState({
+  const [quickOrderData, setQuickOrderData] = useState<QuickOrderData>({
     area: '',
     structure: '',
     volume: '',
     grade: '25MPa',
     deliveryDate: '',
     deliveryTime: '08:00',
-    selectedAgent: ''
+    contactName: '',
+    contactPhone: '',
+    location: '',
+    specialInstructions: ''
   });
 
   // Available agents for selection
@@ -175,37 +179,23 @@ const SiteAgentDashboard = () => {
     return structure ? structure.recommendedGrade : '25MPa';
   };
 
-  const handleQuickOrder = () => {
-    if (!quickOrderData.area || !quickOrderData.structure || !quickOrderData.volume || !quickOrderData.selectedAgent) {
-      alert('Please fill in all required fields for quick order (including agent selection)');
+  const handleQuickOrder = async () => {
+    if (!quickOrderData.area || !quickOrderData.structure || !quickOrderData.volume || !quickOrderData.contactName) {
+      alert('Please fill in all required fields for quick order');
       return;
     }
     
     setSyncStatus('syncing');
     try {
-      // Create order using real-time service
-      const selectedAgent = availableAgents.find(a => a.id === quickOrderData.selectedAgent);
-      const orderData = {
-        projectName: 'Quick Order',
-        location: 'Site Location',
-        areaId: quickOrderData.area,
-        structureId: quickOrderData.structure,
-        volume: parseFloat(quickOrderData.volume),
-        grade: quickOrderData.grade,
-        slump: 100,
-        deliveryDate: quickOrderData.deliveryDate,
-        deliveryTime: quickOrderData.deliveryTime,
-        status: 'Pending' as const,
-        contactName: selectedAgent ? selectedAgent.name : 'Site Agent',
-        contactPhone: selectedAgent ? selectedAgent.phone : '+27 82 123 4567',
-        specialInstructions: selectedAgent ? `Order placed by ${selectedAgent.name} from ${selectedAgent.company}` : 'Quick order from site agent'
-      };
+      const newOrder = await orderService.createQuickOrder({
+        ...quickOrderData,
+        location: quickOrderData.location || 'Site Location'
+      });
       
-      const newOrder = realTimeDataService.createOrder(orderData);
       setSyncStatus('connected');
       setLastSync(new Date().toLocaleTimeString());
       
-      alert(`Quick order submitted for ${quickOrderData.volume}m³ of ${quickOrderData.grade} concrete (Order ID: ${newOrder.id})`);
+      alert(`Order ${newOrder.id} created successfully for ${quickOrderData.volume}m³ of ${quickOrderData.grade} concrete`);
       
       // Reset form
       setQuickOrderData({
@@ -215,10 +205,14 @@ const SiteAgentDashboard = () => {
         grade: '25MPa',
         deliveryDate: '',
         deliveryTime: '08:00',
-        selectedAgent: ''
+        contactName: '',
+        contactPhone: '',
+        location: '',
+        specialInstructions: ''
       });
       setSelectedArea('');
       setSelectedStructure('');
+      setShowOrderForm(false);
     } catch (error) {
       console.error('Failed to create order:', error);
       setSyncStatus('disconnected');
@@ -428,7 +422,7 @@ const SiteAgentDashboard = () => {
               <Select value={selectedArea} onValueChange={(value) => {
                 setSelectedArea(value);
                 setSelectedStructure('');
-                setQuickOrderData({ ...quickOrderData, area: value, structure: '', selectedAgent: '' });
+                setQuickOrderData({ ...quickOrderData, area: value, structure: '' });
               }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose project area" />
@@ -480,8 +474,8 @@ const SiteAgentDashboard = () => {
             <div>
               <Label htmlFor="agent">Ordering Agent</Label>
               <Select 
-                value={quickOrderData.selectedAgent} 
-                onValueChange={(value) => setQuickOrderData({ ...quickOrderData, selectedAgent: value })}
+                value={availableAgents[0]?.id || ''} 
+                onValueChange={() => {/* Legacy field - no operation */}}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select ordering agent" />
@@ -505,23 +499,17 @@ const SiteAgentDashboard = () => {
             </div>
             <div>
               <Label className="text-sm text-muted-foreground">Agent Details</Label>
-              {quickOrderData.selectedAgent ? (
+              {quickOrderData.contactName ? (
                 <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
-                  {(() => {
-                    const selectedAgent = availableAgents.find(a => a.id === quickOrderData.selectedAgent);
-                    return selectedAgent ? (
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-blue-800">{selectedAgent.name}</p>
-                        <p className="text-xs text-blue-600">{selectedAgent.phone}</p>
-                        <p className="text-xs text-blue-600">{selectedAgent.email}</p>
-                        <Badge className="text-xs bg-blue-600 text-white">{selectedAgent.site}</Badge>
-                      </div>
-                    ) : null;
-                  })()} 
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-blue-800">{quickOrderData.contactName}</p>
+                    <p className="text-xs text-blue-600">{quickOrderData.contactPhone}</p>
+                    <p className="text-xs text-blue-600">{quickOrderData.location}</p>
+                  </div> 
                 </div>
               ) : (
                 <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
-                  <p className="text-sm text-gray-500">No agent selected</p>
+                  <p className="text-sm text-gray-500">No contact selected</p>
                 </div>
               )}
             </div>
@@ -606,7 +594,115 @@ const SiteAgentDashboard = () => {
                 <DialogHeader>
                   <DialogTitle>Advanced Order Form</DialogTitle>
                 </DialogHeader>
-                {/* Advanced order form content */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="contact_name">Contact Name</Label>
+                      <Input 
+                        id="contact_name" 
+                        placeholder="John Smith" 
+                        value={quickOrderData.contactName}
+                        onChange={(e) => setQuickOrderData({ ...quickOrderData, contactName: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="contact_phone">Contact Phone</Label>
+                      <Input 
+                        id="contact_phone" 
+                        placeholder="+27 82 123 4567" 
+                        value={quickOrderData.contactPhone}
+                        onChange={(e) => setQuickOrderData({ ...quickOrderData, contactPhone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="location">Site Location</Label>
+                    <Input 
+                      id="location" 
+                      placeholder="123 Construction Site, Cape Town" 
+                      value={quickOrderData.location}
+                      onChange={(e) => setQuickOrderData({ ...quickOrderData, location: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="adv_volume">Volume (m³)</Label>
+                      <Input 
+                        id="adv_volume" 
+                        type="number" 
+                        placeholder="25" 
+                        value={quickOrderData.volume}
+                        onChange={(e) => setQuickOrderData({ ...quickOrderData, volume: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="adv_grade">Concrete Grade</Label>
+                      <Select 
+                        value={quickOrderData.grade} 
+                        onValueChange={(value) => setQuickOrderData({ ...quickOrderData, grade: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="15MPa">15MPa - Blinding</SelectItem>
+                          <SelectItem value="20MPa">20MPa - General</SelectItem>
+                          <SelectItem value="25MPa">25MPa - Foundation</SelectItem>
+                          <SelectItem value="30MPa">30MPa - Structural</SelectItem>
+                          <SelectItem value="35MPa">35MPa - High Strength</SelectItem>
+                          <SelectItem value="40MPa">40MPa - Premium</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="adv_delivery_date">Delivery Date</Label>
+                      <Input 
+                        id="adv_delivery_date" 
+                        type="date" 
+                        value={quickOrderData.deliveryDate}
+                        onChange={(e) => setQuickOrderData({ ...quickOrderData, deliveryDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="adv_delivery_time">Delivery Time</Label>
+                      <Select 
+                        value={quickOrderData.deliveryTime} 
+                        onValueChange={(value) => setQuickOrderData({ ...quickOrderData, deliveryTime: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="06:00">06:00 AM</SelectItem>
+                          <SelectItem value="08:00">08:00 AM</SelectItem>
+                          <SelectItem value="10:00">10:00 AM</SelectItem>
+                          <SelectItem value="12:00">12:00 PM</SelectItem>
+                          <SelectItem value="14:00">02:00 PM</SelectItem>
+                          <SelectItem value="16:00">04:00 PM</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="special_instructions">Special Instructions</Label>
+                    <Textarea 
+                      id="special_instructions" 
+                      placeholder="Any special requirements or notes..." 
+                      value={quickOrderData.specialInstructions || ''}
+                      onChange={(e) => setQuickOrderData({ ...quickOrderData, specialInstructions: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button className="flex-1" onClick={handleQuickOrder}>
+                      Submit Advanced Order
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowOrderForm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
               </DialogContent>
             </Dialog>
             <Dialog open={showAreaManagement} onOpenChange={setShowAreaManagement}>
@@ -708,7 +804,7 @@ const SiteAgentDashboard = () => {
                               </SelectContent>
                             </Select>
                             <Select 
-                              value={newStructureData.recommendedGrade} 
+                              value={newStructureData.recommendedGrade}
                               onValueChange={(value) => setNewStructureData({ ...newStructureData, recommendedGrade: value })}
                             >
                               <SelectTrigger>
@@ -723,8 +819,8 @@ const SiteAgentDashboard = () => {
                                 <SelectItem value="40MPa">40MPa</SelectItem>
                               </SelectContent>
                             </Select>
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               onClick={() => addStructureToArea(area.id)}
                             >
                               <Plus className="w-4 h-4" />
@@ -741,9 +837,9 @@ const SiteAgentDashboard = () => {
                                 <Badge variant="outline" className="text-xs">{structure.type}</Badge>
                                 <Badge className="text-xs bg-green-600">{structure.recommendedGrade}</Badge>
                               </div>
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
+                              <Button
+                                size="sm"
+                                variant="ghost"
                                 onClick={() => removeStructure(area.id, structure.id)}
                               >
                                 <Trash2 className="w-4 h-4 text-red-500" />
@@ -1262,12 +1358,10 @@ const SiteAgentDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Real-Time Sync Panel */}
-      <RealTimeSyncPanel 
-        userRole="site-agent" 
-        userId="site-agent-1" 
-        userName="Site Agent"
-      />
+      {/* Real-time Sync Status Panel */}
+      <Card>
+        <RealTimeSyncStatus />
+      </Card>
 
       {/* Site Photos */}
       <PhotoUpload 
