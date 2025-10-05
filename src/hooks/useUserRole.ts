@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth, UserRole } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
+
+export type UserRole = 'admin' | 'site_agent' | null;
 
 export const useUserRole = () => {
   const { user } = useAuth();

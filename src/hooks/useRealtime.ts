@@ -95,44 +95,44 @@ export const useRealtimeOrders = () => {
           console.log('Order change received:', payload);
           
           if (payload.eventType === 'INSERT') {
-            const newOrder = payload.new as Record<string, unknown>;
+            const newOrder = payload.new as any;
             setOrders(prev => [{
-              id: newOrder.id,
-              order_number: newOrder.order_number,
-              status: newOrder.status,
-              volume: newOrder.volume,
-              delivery_date: newOrder.delivery_date,
-              site_name: newOrder.site_name,
-              updated_at: newOrder.updated_at
+              id: newOrder.id as string,
+              order_number: newOrder.order_number as string,
+              status: newOrder.status as string,
+              volume: newOrder.volume as number,
+              delivery_date: newOrder.delivery_date as string,
+              site_name: newOrder.site_name as string,
+              updated_at: newOrder.updated_at as string
             }, ...prev.slice(0, 9)]);
 
             // Send push notification for new orders
             notificationService.sendOrderUpdateNotification({
-              orderId: newOrder.order_number,
-              status: newOrder.status,
+              orderId: newOrder.order_number as string,
+              status: newOrder.status as string,
               message: `New order placed: ${newOrder.volume}m³ for ${newOrder.delivery_date}`
             }).catch((err: Error) => console.error(err));
           } else if (payload.eventType === 'UPDATE') {
-            const updatedOrder = payload.new as Record<string, unknown>;
+            const updatedOrder = payload.new as any;
             setOrders(prev => prev.map(order => 
               order.id === updatedOrder.id 
                 ? {
                     ...order,
-                    status: updatedOrder.status,
-                    updated_at: updatedOrder.updated_at
+                    status: updatedOrder.status as string,
+                    updated_at: updatedOrder.updated_at as string
                   }
                 : order
             ));
 
             // Send push notification for status changes
             notificationService.sendOrderUpdateNotification({
-              orderId: updatedOrder.order_number,
-              status: updatedOrder.status,
+              orderId: updatedOrder.order_number as string,
+              status: updatedOrder.status as string,
               message: `Order status changed to: ${updatedOrder.status}`
             }).catch((err: Error) => console.error(err));
           } else if (payload.eventType === 'DELETE') {
-            const deletedOrder = payload.old as Record<string, unknown>;
-            setOrders(prev => prev.filter(order => order.id !== deletedOrder.id));
+            const deletedOrder = payload.old as any;
+            setOrders(prev => prev.filter(order => order.id !== (deletedOrder.id as string)));
           }
         }
       )
