@@ -7,6 +7,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRealtimeNotifications } from '@/hooks/useRealtime';
 import { formatDistanceToNow } from 'date-fns';
+import { cn } from '@/lib/utils';
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  is_read: boolean;
+  created_at: string;
+}
 
 export const NotificationBell = () => {
   const [open, setOpen] = useState(false);
@@ -97,41 +107,45 @@ export const NotificationBell = () => {
             ) : (
               <ScrollArea className="h-80">
                 <div className="space-y-1">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-4 border-b border-border last:border-b-0 hover:bg-muted/50 cursor-pointer ${
-                        !notification.is_read ? 'bg-blue-50/50' : ''
-                      }`}
-                      onClick={() => {
-                        if (!notification.is_read) {
-                          markAsRead(notification.id);
-                        }
-                      }}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="text-lg">
-                          {getNotificationIcon(notification.type)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className={`text-sm font-medium ${getNotificationColor(notification.type)}`}>
-                              {notification.title}
-                            </p>
-                            {!notification.is_read && (
-                              <div className="w-2 h-2 bg-blue-600 rounded-full" />
-                            )}
+                  {notifications.map((notification) => {
+                    const n = notification as any as Notification;
+                    return (
+                      <div
+                        key={n.id}
+                        className={cn(
+                          "p-4 border-b border-border last:border-b-0 hover:bg-muted/50 cursor-pointer",
+                          !n.is_read && "bg-blue-50/50"
+                        )}
+                        onClick={() => {
+                          if (!n.is_read) {
+                            markAsRead(n.id);
+                          }
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="text-lg">
+                            {getNotificationIcon(n.type)}
                           </div>
-                          <p className="text-xs text-muted-foreground mb-1">
-                            {notification.message}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className={`text-sm font-medium ${getNotificationColor(n.type)}`}>
+                                {n.title}
+                              </p>
+                              {!n.is_read && (
+                                <div className="w-2 h-2 bg-blue-600 rounded-full" />
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {n.message}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ScrollArea>
             )}

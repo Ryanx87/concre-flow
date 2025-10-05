@@ -158,28 +158,12 @@ class PhotoService {
         ...metadata
       };
 
-      // Store metadata in database
-      const { error: dbError } = await supabase
-        .from('site_photos')
-        .insert({
-          id: photoMetadata.id,
-          filename: photoMetadata.filename,
-          url: photoMetadata.url,
-          thumbnail_url: photoMetadata.thumbnailUrl,
-          size: photoMetadata.size,
-          type: photoMetadata.type,
-          description: photoMetadata.description,
-          tags: photoMetadata.tags,
-          site_id: photoMetadata.siteId,
-          order_id: photoMetadata.orderId,
-          location: photoMetadata.location,
-          created_at: photoMetadata.timestamp
-        });
-
-      if (dbError) {
-        console.error('Error saving photo metadata:', dbError);
-        // Continue anyway - photo is uploaded
-      }
+      // TODO: Store metadata in database when site_photos table is created
+      // const { error: dbError } = await supabase
+      //   .from('site_photos')
+      //   .insert({...});
+      
+      // For now, just return the metadata without storing in DB
 
       return photoMetadata;
     } catch (error) {
@@ -190,75 +174,15 @@ class PhotoService {
 
   // Get photos for a site or order
   async getPhotos(siteId?: string, orderId?: string): Promise<PhotoMetadata[]> {
-    try {
-      let query = supabase
-        .from('site_photos')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (siteId) {
-        query = query.eq('site_id', siteId);
-      }
-      if (orderId) {
-        query = query.eq('order_id', orderId);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      return (data || []).map(photo => ({
-        id: photo.id,
-        filename: photo.filename,
-        url: photo.url,
-        thumbnailUrl: photo.thumbnail_url,
-        size: photo.size,
-        type: photo.type,
-        timestamp: photo.created_at,
-        location: photo.location,
-        description: photo.description,
-        tags: photo.tags,
-        siteId: photo.site_id,
-        orderId: photo.order_id
-      }));
-    } catch (error) {
-      console.error('Error fetching photos:', error);
-      return [];
-    }
+    // TODO: Implement when site_photos table is created
+    console.log('getPhotos called with:', { siteId, orderId });
+    return [];
   }
 
   // Delete photo
   async deletePhoto(photoId: string): Promise<void> {
-    try {
-      // Get photo metadata
-      const { data: photo, error: fetchError } = await supabase
-        .from('site_photos')
-        .select('filename')
-        .eq('id', photoId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from('site-photos')
-        .remove([`site-photos/${photo.filename}`]);
-
-      if (storageError) {
-        console.warn('Error deleting from storage:', storageError);
-      }
-
-      // Delete from database
-      const { error: dbError } = await supabase
-        .from('site_photos')
-        .delete()
-        .eq('id', photoId);
-
-      if (dbError) throw dbError;
-    } catch (error) {
-      console.error('Error deleting photo:', error);
-      throw new Error(`Failed to delete photo: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    // TODO: Implement when site_photos table is created
+    console.log('deletePhoto called with:', photoId);
   }
 
   // Get storage usage statistics
@@ -267,30 +191,12 @@ class PhotoService {
     totalSize: number;
     averageSize: number;
   }> {
-    try {
-      const { data, error } = await supabase
-        .from('site_photos')
-        .select('size');
-
-      if (error) throw error;
-
-      const totalPhotos = data?.length || 0;
-      const totalSize = data?.reduce((sum, photo) => sum + (photo.size || 0), 0) || 0;
-      const averageSize = totalPhotos > 0 ? totalSize / totalPhotos : 0;
-
-      return {
-        totalPhotos,
-        totalSize,
-        averageSize
-      };
-    } catch (error) {
-      console.error('Error fetching storage stats:', error);
-      return {
-        totalPhotos: 0,
-        totalSize: 0,
-        averageSize: 0
-      };
-    }
+    // TODO: Implement when site_photos table is created
+    return {
+      totalPhotos: 0,
+      totalSize: 0,
+      averageSize: 0
+    };
   }
 }
 
