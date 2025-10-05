@@ -7,10 +7,13 @@ import { SiteAgentRoute } from '@/components/auth/ProtectedRoute';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
+import { RealtimeStatusBadge } from '@/components/dashboard/RealtimeStatusBadge';
 
 const SiteAgentDashboard = () => {
   const { user, logout } = useAuth();
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const realtimeStatus = useRealtimeSync();
 
   const handleSignOut = () => {
     logout();
@@ -32,7 +35,8 @@ const SiteAgentDashboard = () => {
                 <p className="text-sm text-white/80">Site Agent Portal</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <RealtimeStatusBadge status={realtimeStatus} />
               <NotificationBell />
               <Dialog open={showNotificationSettings} onOpenChange={setShowNotificationSettings}>
                 <DialogTrigger asChild>
