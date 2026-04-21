@@ -2,8 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { AuthenticatedRoute, AdminRoute } from "./components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -23,34 +25,36 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/orders" element={<OrderManagement />} />
-            <Route path="/tracking" element={<TruckTracking />} />
-            <Route path="/materials" element={<MaterialStock />} />
-            <Route path="/batching" element={<BatchingSchedule />} />
-            <Route path="/quality" element={<QualityControl />} />
-            <Route path="/ai-demo" element={<AIDocumentDemo />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/users" element={<UserManagement />} />
-            <Route path="/deliveries" element={<DeliveryManagement />} />
-            <Route path="/issues" element={<IssuesManagement />} />
-            <Route path="/maintenance" element={<PlantMaintenance />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/orders" element={<AuthenticatedRoute><OrderManagement /></AuthenticatedRoute>} />
+              <Route path="/tracking" element={<AuthenticatedRoute><TruckTracking /></AuthenticatedRoute>} />
+              <Route path="/materials" element={<AdminRoute><MaterialStock /></AdminRoute>} />
+              <Route path="/batching" element={<AdminRoute><BatchingSchedule /></AdminRoute>} />
+              <Route path="/quality" element={<AdminRoute><QualityControl /></AdminRoute>} />
+              <Route path="/ai-demo" element={<AuthenticatedRoute><AIDocumentDemo /></AuthenticatedRoute>} />
+              <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
+              <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
+              <Route path="/deliveries" element={<AuthenticatedRoute><DeliveryManagement /></AuthenticatedRoute>} />
+              <Route path="/issues" element={<AuthenticatedRoute><IssuesManagement /></AuthenticatedRoute>} />
+              <Route path="/maintenance" element={<AdminRoute><PlantMaintenance /></AdminRoute>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
