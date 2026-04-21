@@ -11,8 +11,10 @@ export interface SignUpData {
 }
 
 export const signUp = async (data: SignUpData) => {
-  const redirectUrl = `${window.location.origin}/`;
-  
+  const redirectUrl = `${window.location.origin}/dashboard`;
+
+  // The handle_new_user trigger will automatically create the profile,
+  // company (if company_name provided), and user_role from raw_user_meta_data.
   const { data: authData, error } = await supabase.auth.signUp({
     email: data.email,
     password: data.password,
@@ -28,41 +30,21 @@ export const signUp = async (data: SignUpData) => {
     },
   });
 
-  // If signup is successful, create user profile and role
-  if (authData.user && !error) {
-    try {
-      // Create user profile
-      await supabase.from('profiles').insert({
-        id: authData.user.id,
-        first_name: data.firstName,
-        last_name: data.lastName,
-        phone: data.phone,
-        company_id: null, // Will be set later by admin
-      });
-
-      // Create user role
-      await supabase.from('user_roles').insert({
-        user_id: authData.user.id,
-        role: data.role || 'site_agent',
-      });
-    } catch (profileError) {
-      console.error('Error creating user profile:', profileError);
-    }
+  // If a non-default role was requested, update it after the trigger runs.
+  if (authData.user && !error && data.role && data.role !== 'site_agent') {
+    await supabase
+      .from('user_roles')
+      .update({ role: data.role })
+      .eq('user_id', authData.user.id);
   }
 
   return { data: authData, error };
 };
 
 export const signIn = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  return { data, error };
+  return await supabase.auth.signInWithPassword({ email, password });
 };
 
 export const signOut = async () => {
-  const { error } = await supabase.auth.signOut();
-  return { error };
+  return await supabase.auth.signOut();
 };
