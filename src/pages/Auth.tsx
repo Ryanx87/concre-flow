@@ -1,199 +1,199 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { Truck, Building2, Shield, HardHat, ArrowRight, Users, Settings, Package, BarChart3, MapPin, Clock } from 'lucide-react';
+import { signIn, signUp } from '@/lib/auth';
+import { useToast } from '@/hooks/use-toast';
+import { Truck, Loader2 } from 'lucide-react';
+import { z } from 'zod';
+
+const signInSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
+const signUpSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  firstName: z.string().min(1, 'First name required').max(50),
+  lastName: z.string().min(1, 'Last name required').max(50),
+  companyName: z.string().min(1, 'Company name required').max(100),
+  phone: z.string().min(7, 'Valid phone required').max(20),
+  role: z.enum(['admin', 'site_agent']),
+});
 
 const Auth = () => {
-  const { login } = useAuth();
-  const [selectedRole, setSelectedRole] = useState<'admin' | 'site_agent' | ''>('');
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
-  // Role-based theme colors
-  const getRoleTheme = () => {
-    switch (selectedRole) {
-      case 'admin':
-        return {
-          bgGradient: 'from-blue-600 via-blue-500 to-blue-400',
-          icon: Building2,
-          iconColor: 'text-blue-600',
-          badgeColor: 'bg-blue-100 text-blue-800',
-          title: 'Admin Dashboard',
-          description: 'Manage operations, view analytics, and oversee production'
-        };
-      case 'site_agent':
-        return {
-          bgGradient: 'from-orange-600 via-orange-500 to-orange-400',
-          icon: HardHat,
-          iconColor: 'text-orange-600',
-          badgeColor: 'bg-orange-100 text-orange-800',
-          title: 'Site Agent Portal',
-          description: 'Track deliveries, place orders, and manage site operations'
-        };
-      default:
-        return {
-          bgGradient: 'from-primary via-primary-light to-secondary',
-          icon: Truck,
-          iconColor: 'text-primary',
-          badgeColor: 'bg-primary/10 text-primary',
-          title: 'Concre-tek Portal',
-          description: 'Ready-mix concrete order management system'
-        };
+  const [signInData, setSignInData] = useState({ email: '', password: '' });
+  const [signUpData, setSignUpData] = useState({
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    companyName: '',
+    phone: '',
+    role: 'site_agent' as 'admin' | 'site_agent',
+  });
+
+  useEffect(() => {
+    if (!authLoading && user) navigate('/dashboard', { replace: true });
+  }, [user, authLoading, navigate]);
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = signInSchema.safeParse(signInData);
+    if (!parsed.success) {
+      toast({ title: 'Invalid input', description: parsed.error.errors[0].message, variant: 'destructive' });
+      return;
     }
-  };
-
-  const theme = getRoleTheme();
-  const RoleIcon = theme.icon;
-
-  const handleRoleLogin = (role: 'admin' | 'site_agent') => {
     setLoading(true);
-    setSelectedRole(role);
-    
-    // Simulate a brief loading state
-    setTimeout(() => {
-      login(role);
-      setLoading(false);
-    }, 500);
+    const { error } = await signIn(parsed.data.email, parsed.data.password);
+    setLoading(false);
+    if (error) {
+      toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Welcome back!' });
+    navigate('/dashboard', { replace: true });
   };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = signUpSchema.safeParse(signUpData);
+    if (!parsed.success) {
+      toast({ title: 'Invalid input', description: parsed.error.errors[0].message, variant: 'destructive' });
+      return;
+    }
+    setLoading(true);
+    const { error } = await signUp(parsed.data as Parameters<typeof signUp>[0]);
+    setLoading(false);
+    if (error) {
+      toast({ title: 'Sign up failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Account created!', description: 'You can now sign in.' });
+    navigate('/dashboard', { replace: true });
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <Loader2 className="w-8 h-8 text-white animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="bg-white rounded-full p-4">
-              <Truck className="w-12 h-12 text-slate-800" />
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <div className="bg-white rounded-full p-3">
+              <Truck className="w-8 h-8 text-slate-800" />
             </div>
           </div>
-          <h1 className="text-5xl font-bold text-white mb-3">Concre-tek</h1>
-          <p className="text-white/80 text-lg">by Greenspot Legacy</p>
-          <p className="text-white/60 mt-2">Ready-mix concrete order management system</p>
+          <h1 className="text-3xl font-bold text-white">Concre-tek</h1>
+          <p className="text-white/70 text-sm mt-1">by Greenspot Legacy</p>
         </div>
 
-        {/* Role Selection Cards */}
-        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          {/* Admin Login Card */}
-          <Card className="shadow-2xl border-0 bg-gradient-to-br from-blue-50 to-blue-100/50 hover:shadow-3xl transition-all duration-300 hover:scale-105">
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto mb-4 p-4 rounded-full bg-blue-600 w-16 h-16 flex items-center justify-center">
-                <Shield className="w-8 h-8 text-white" />
-              </div>
-              <CardTitle className="text-2xl text-blue-900">Administrator</CardTitle>
-              <CardDescription className="text-blue-700">
-                Plant management, operations oversight, and analytics
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Admin Features */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 text-sm text-blue-800">
-                  <BarChart3 className="w-4 h-4" />
-                  <span>Plant status & capacity monitoring</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-blue-800">
-                  <Package className="w-4 h-4" />
-                  <span>Material stock & inventory management</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-blue-800">
-                  <Users className="w-4 h-4" />
-                  <span>Order approval & batching schedule</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-blue-800">
-                  <Settings className="w-4 h-4" />
-                  <span>Truck dispatch & quality compliance</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-blue-800">
-                  <BarChart3 className="w-4 h-4" />
-                  <span>Reports & analytics dashboard</span>
-                </div>
-              </div>
-              
-              <Button 
-                onClick={() => handleRoleLogin('admin')}
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 text-lg font-semibold"
-              >
-                {loading && selectedRole === 'admin' ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Accessing Admin Dashboard...
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    Access Admin Dashboard
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
+        <Card className="shadow-2xl border-0">
+          <CardHeader>
+            <CardTitle>Welcome</CardTitle>
+            <CardDescription>Sign in or create an account to continue</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="signin">
+              <TabsList className="grid grid-cols-2 w-full">
+                <TabsTrigger value="signin">Sign In</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
 
-          {/* Site Agent Login Card */}
-          <Card className="shadow-2xl border-0 bg-gradient-to-br from-orange-50 to-orange-100/50 hover:shadow-3xl transition-all duration-300 hover:scale-105">
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto mb-4 p-4 rounded-full bg-orange-600 w-16 h-16 flex items-center justify-center">
-                <HardHat className="w-8 h-8 text-white" />
-              </div>
-              <CardTitle className="text-2xl text-orange-900">Site Agent</CardTitle>
-              <CardDescription className="text-orange-700">
-                Order placement, delivery tracking, and site operations
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Site Agent Features */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 text-sm text-orange-800">
-                  <Package className="w-4 h-4" />
-                  <span>Create & submit concrete orders</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-orange-800">
-                  <Clock className="w-4 h-4" />
-                  <span>Track delivery timeline & status</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-orange-800">
-                  <MapPin className="w-4 h-4" />
-                  <span>Live truck tracking & ETAs</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-orange-800">
-                  <Users className="w-4 h-4" />
-                  <span>Confirm deliveries & report issues</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-orange-800">
-                  <BarChart3 className="w-4 h-4" />
-                  <span>Project reports & order history</span>
-                </div>
-              </div>
-              
-              <Button 
-                onClick={() => handleRoleLogin('site_agent')}
-                disabled={loading}
-                className="w-full bg-orange-600 hover:bg-orange-700 text-white h-12 text-lg font-semibold"
-              >
-                {loading && selectedRole === 'site_agent' ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Accessing Site Agent Portal...
+              <TabsContent value="signin">
+                <form onSubmit={handleSignIn} className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-email">Email</Label>
+                    <Input
+                      id="signin-email"
+                      type="email"
+                      autoComplete="email"
+                      value={signInData.email}
+                      onChange={(e) => setSignInData({ ...signInData, email: e.target.value })}
+                      required
+                    />
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <HardHat className="w-5 h-5" />
-                    Access Site Agent Portal
-                    <ArrowRight className="w-4 h-4" />
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-password">Password</Label>
+                    <Input
+                      id="signin-password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={signInData.password}
+                      onChange={(e) => setSignInData({ ...signInData, password: e.target.value })}
+                      required
+                    />
                   </div>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In'}
+                  </Button>
+                </form>
+              </TabsContent>
 
-        {/* Footer Info */}
-        <div className="text-center mt-8 text-white/60 text-sm">
-          <p>Select your role to access the appropriate dashboard</p>
-          <p className="mt-1">No password required - role-based access only</p>
-        </div>
+              <TabsContent value="signup">
+                <form onSubmit={handleSignUp} className="space-y-3 mt-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="first-name">First name</Label>
+                      <Input id="first-name" value={signUpData.firstName} onChange={(e) => setSignUpData({ ...signUpData, firstName: e.target.value })} required />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="last-name">Last name</Label>
+                      <Input id="last-name" value={signUpData.lastName} onChange={(e) => setSignUpData({ ...signUpData, lastName: e.target.value })} required />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="company">Company name</Label>
+                    <Input id="company" value={signUpData.companyName} onChange={(e) => setSignUpData({ ...signUpData, companyName: e.target.value })} required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input id="phone" type="tel" value={signUpData.phone} onChange={(e) => setSignUpData({ ...signUpData, phone: e.target.value })} required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input id="signup-email" type="email" autoComplete="email" value={signUpData.email} onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })} required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="signup-password">Password</Label>
+                    <Input id="signup-password" type="password" autoComplete="new-password" value={signUpData.password} onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })} required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="role">Role</Label>
+                    <select
+                      id="role"
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                      value={signUpData.role}
+                      onChange={(e) => setSignUpData({ ...signUpData, role: e.target.value as 'admin' | 'site_agent' })}
+                    >
+                      <option value="site_agent">Site Agent</option>
+                      <option value="admin">Administrator</option>
+                    </select>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Account'}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

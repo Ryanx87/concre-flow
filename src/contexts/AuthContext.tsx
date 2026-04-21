@@ -1,95 +1,89 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
 export type UserRole = 'admin' | 'site_agent' | null;
 
 interface AuthContextType {
-  user: { id: string; email: string; role: UserRole } | null;
-  role: UserRole | null;
+  user: User | null;
+  session: Session | null;
+  role: UserRole;
   loading: boolean;
   theme: 'admin' | 'site_agent' | 'default';
-  login: (role: UserRole) => void;
-  logout: () => void;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  session: null,
   role: null,
   loading: true,
   theme: 'default',
-  login: () => {},
-  logout: () => {},
+  signOut: async () => {},
 });
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<{ id: string; email: string; role: UserRole } | null>(null);
-  const [role, setRole] = useState<UserRole | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [role, setRole] = useState<UserRole>(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Determine theme based on role
   const theme = role === 'admin' ? 'admin' : role === 'site_agent' ? 'site_agent' : 'default';
 
-  // Login function - creates a mock user with the selected role
-  const login = (selectedRole: UserRole) => {
-    const mockUser = {
-      id: `mock-${selectedRole}-${Date.now()}`,
-      email: `${selectedRole}@concretek.com`,
-      role: selectedRole
-    };
-    
-    setUser(mockUser);
-    setRole(selectedRole);
-    
-    // Store in localStorage for persistence
-    localStorage.setItem('concretek_user', JSON.stringify(mockUser));
-    localStorage.setItem('concretek_role', selectedRole);
-    
-    navigate('/dashboard');
+  const fetchRole = async (userId: string) => {
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
+    setRole((data?.role as UserRole) ?? 'site_agent');
   };
 
-  // Logout function
-  const logout = () => {
+  useEffect(() => {
+    // Set up listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+      if (newSession?.user) {
+        // Defer DB call to avoid deadlock
+        setTimeout(() => fetchRole(newSession.user.id), 0);
+      } else {
+        setRole(null);
+      }
+    });
+
+    // THEN check existing session
+    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+      setSession(existingSession);
+      setUser(existingSession?.user ?? null);
+      if (existingSession?.user) {
+        fetchRole(existingSession.user.id).finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
     setRole(null);
-    
-    // Clear localStorage
-    localStorage.removeItem('concretek_user');
-    localStorage.removeItem('concretek_role');
-    
     navigate('/auth');
   };
 
-  // Check for existing session on mount
-  useEffect(() => {
-    const storedUser = localStorage.getItem('concretek_user');
-    const storedRole = localStorage.getItem('concretek_role') as UserRole;
-    
-    if (storedUser && storedRole) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        setRole(storedRole);
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('concretek_user');
-        localStorage.removeItem('concretek_role');
-      }
-    }
-    
-    setLoading(false);
-  }, []);
-
   return (
-    <AuthContext.Provider value={{ user, role, loading, theme, login, logout }}>
+    <AuthContext.Provider value={{ user, session, role, loading, theme, signOut }}>
       {children}
     </AuthContext.Provider>
   );
