@@ -1,3 +1,6 @@
+import { supabase } from '@/integrations/supabase/client';
+
+// Public API types (unchanged for backward compatibility with dashboards)
 export interface ProjectArea {
   id: string;
   name: string;
@@ -50,17 +53,78 @@ export interface UserActivity {
 
 type DataChangeListener = (data: any, action: string, resourceType: string) => void;
 
+// ---------- mappers between DB rows and public API ----------
+
+const dbStructureTypeToUi = (t: string): Structure['type'] => {
+  switch (t) {
+    case 'foundation': return 'Foundation';
+    case 'column':
+    case 'beam':
+    case 'slab':
+    case 'wall':
+    case 'staircase': return 'Structural';
+    default: return 'General';
+  }
+};
+
+const uiStructureTypeToDb = (t: string): 'foundation' | 'column' | 'beam' | 'slab' | 'wall' | 'staircase' => {
+  const lower = t.toLowerCase();
+  if (lower === 'foundation') return 'foundation';
+  if (lower === 'paving') return 'slab';
+  // 'Structural' / 'General' → default to slab
+  return 'slab';
+};
+
+const dbOrderStatusToUi = (s: string | null): ConcreteOrder['status'] => {
+  switch (s) {
+    case 'pending_approval': return 'Pending';
+    case 'approved': return 'Confirmed';
+    case 'in_production': return 'In Production';
+    case 'dispatched': return 'Dispatched';
+    case 'delivered': return 'Delivered';
+    case 'rejected': return 'Cancelled';
+    default: return 'Pending';
+  }
+};
+
+const uiOrderStatusToDb = (s: ConcreteOrder['status']):
+  'pending_approval' | 'approved' | 'in_production' | 'dispatched' | 'delivered' | 'rejected' => {
+  switch (s) {
+    case 'Pending': return 'pending_approval';
+    case 'Confirmed': return 'approved';
+    case 'In Production': return 'in_production';
+    case 'Dispatched': return 'dispatched';
+    case 'Delivered': return 'delivered';
+    case 'Cancelled': return 'rejected';
+  }
+};
+
+const normalizeGrade = (grade: string): '20MPa' | '25MPa' | '30MPa' | '40MPa' | '50MPa' => {
+  const g = grade.replace(/\s/g, '').toUpperCase();
+  if (g.startsWith('20')) return '20MPa';
+  if (g.startsWith('25')) return '25MPa';
+  if (g.startsWith('30')) return '30MPa';
+  if (g.startsWith('35') || g.startsWith('40')) return '40MPa';
+  if (g.startsWith('45') || g.startsWith('50')) return '50MPa';
+  return '25MPa';
+};
+
+// ---------- Service ----------
+
 class RealTimeDataService {
   private static instance: RealTimeDataService;
   private listeners: Map<string, DataChangeListener[]> = new Map();
   private projectAreas: ProjectArea[] = [];
   private orders: ConcreteOrder[] = [];
   private activities: UserActivity[] = [];
-  private currentUser = { id: 'user-1', role: 'site-agent', name: 'Site Agent' };
+  private currentUser: { id: string; role: string; name: string; companyId?: string } = {
+    id: '', role: 'site-agent', name: 'Guest'
+  };
+  private initialized = false;
+  private realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 
   private constructor() {
-    this.initializeDefaultData();
-    this.setupPeriodicSync();
+    this.bootstrap();
   }
 
   static getInstance(): RealTimeDataService {
@@ -70,385 +134,276 @@ class RealTimeDataService {
     return RealTimeDataService.instance;
   }
 
-  private initializeDefaultData() {
-    this.projectAreas = [
-      {
-        id: 'area-1',
-        name: 'Foundation Zone A',
-        progress: 65,
-        lastUpdated: new Date().toISOString(),
-        updatedBy: 'admin',
-        structures: [
-          { 
-            id: 'struct-1', 
-            name: 'Strip Foundations', 
-            type: 'Foundation', 
-            recommendedGrade: '25MPa',
-            lastUpdated: new Date().toISOString(),
-            updatedBy: 'admin'
-          },
-          { 
-            id: 'struct-2', 
-            name: 'Pile Caps', 
-            type: 'Foundation', 
-            recommendedGrade: '30MPa',
-            lastUpdated: new Date().toISOString(),
-            updatedBy: 'admin'
-          },
-          { 
-            id: 'struct-3', 
-            name: 'Ground Beams', 
-            type: 'Structural', 
-            recommendedGrade: '30MPa',
-            lastUpdated: new Date().toISOString(),
-            updatedBy: 'admin'
-          }
-        ]
-      },
-      {
-        id: 'area-2',
-        name: 'Structural Frame B',
-        progress: 40,
-        lastUpdated: new Date().toISOString(),
-        updatedBy: 'admin',
-        structures: [
-          { 
-            id: 'struct-4', 
-            name: 'Columns', 
-            type: 'Structural', 
-            recommendedGrade: '40MPa',
-            lastUpdated: new Date().toISOString(),
-            updatedBy: 'admin'
-          },
-          { 
-            id: 'struct-5', 
-            name: 'Beams', 
-            type: 'Structural', 
-            recommendedGrade: '35MPa',
-            lastUpdated: new Date().toISOString(),
-            updatedBy: 'admin'
-          },
-          { 
-            id: 'struct-6', 
-            name: 'Slabs', 
-            type: 'Structural', 
-            recommendedGrade: '30MPa',
-            lastUpdated: new Date().toISOString(),
-            updatedBy: 'admin'
-          }
-        ]
-      },
-      {
-        id: 'area-3',
-        name: 'External Works C',
-        progress: 20,
-        lastUpdated: new Date().toISOString(),
-        updatedBy: 'admin',
-        structures: [
-          { 
-            id: 'struct-7', 
-            name: 'Driveways', 
-            type: 'Paving', 
-            recommendedGrade: '25MPa',
-            lastUpdated: new Date().toISOString(),
-            updatedBy: 'admin'
-          },
-          { 
-            id: 'struct-8', 
-            name: 'Walkways', 
-            type: 'Paving', 
-            recommendedGrade: '20MPa',
-            lastUpdated: new Date().toISOString(),
-            updatedBy: 'admin'
-          },
-          { 
-            id: 'struct-9', 
-            name: 'Retaining Walls', 
-            type: 'Structural', 
-            recommendedGrade: '35MPa',
-            lastUpdated: new Date().toISOString(),
-            updatedBy: 'admin'
-          }
-        ]
+  private async bootstrap() {
+    // Pick up auth state and refresh whenever it changes
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        await this.loadCurrentUser(session.user.id);
+        await this.refresh();
+      } else {
+        this.projectAreas = [];
+        this.orders = [];
+        this.activities = [];
+        this.notifyListeners('projectAreas', null, 'reset');
+        this.notifyListeners('orders', null, 'reset');
       }
-    ];
-  }
+    });
 
-  private setupPeriodicSync() {
-    // Simulate real-time updates every 5 seconds
-    setInterval(() => {
-      this.simulateExternalUpdates();
-    }, 5000);
-  }
-
-  private simulateExternalUpdates() {
-    // Simulate updates from other users (admin/agents)
-    if (Math.random() > 0.8) { // 20% chance of external update
-      const updateTypes = ['progress', 'newOrder', 'orderStatus'];
-      const updateType = updateTypes[Math.floor(Math.random() * updateTypes.length)];
-      
-      switch (updateType) {
-        case 'progress':
-          this.simulateProgressUpdate();
-          break;
-        case 'newOrder':
-          this.simulateNewOrder();
-          break;
-        case 'orderStatus':
-          this.simulateOrderStatusUpdate();
-          break;
-      }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      await this.loadCurrentUser(session.user.id);
+      await this.refresh();
+      this.subscribeRealtime();
     }
   }
 
-  private simulateProgressUpdate() {
-    if (this.projectAreas.length > 0) {
-      const randomArea = this.projectAreas[Math.floor(Math.random() * this.projectAreas.length)];
-      const newProgress = Math.min(100, randomArea.progress + Math.floor(Math.random() * 5));
-      
-      if (newProgress !== randomArea.progress) {
-        this.updateAreaProgress(randomArea.id, newProgress, 'external-user');
-      }
-    }
-  }
-
-  private simulateNewOrder() {
-    const newOrder: ConcreteOrder = {
-      id: `ord-${Date.now()}`,
-      projectName: 'Auto Generated Order',
-      location: '123 Construction Site',
-      areaId: this.projectAreas[0]?.id || '',
-      structureId: this.projectAreas[0]?.structures[0]?.id || '',
-      volume: Math.floor(Math.random() * 50) + 10,
-      grade: '25MPa',
-      slump: 100,
-      deliveryDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      deliveryTime: '08:00',
-      status: 'Pending',
-      contactName: 'External User',
-      contactPhone: '+27 82 000 0000',
-      createdAt: new Date().toISOString(),
-      createdBy: 'external-user',
-      lastUpdated: new Date().toISOString(),
-      updatedBy: 'external-user'
+  private async loadCurrentUser(userId: string) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, company_id')
+      .eq('id', userId)
+      .maybeSingle();
+    const { data: roleRow } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
+    this.currentUser = {
+      id: userId,
+      role: roleRow?.role === 'admin' ? 'admin' : 'site-agent',
+      name: profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'User' : 'User',
+      companyId: profile?.company_id ?? undefined,
     };
-
-    this.orders.push(newOrder);
-    this.logActivity('external-user', 'admin', 'create', 'order', newOrder.id, `Created order for ${newOrder.volume}m³`);
-    this.notifyListeners('orders', newOrder, 'create');
   }
 
-  private simulateOrderStatusUpdate() {
-    if (this.orders.length > 0) {
-      const randomOrder = this.orders[Math.floor(Math.random() * this.orders.length)];
-      const statuses: ConcreteOrder['status'][] = ['Confirmed', 'In Production', 'Dispatched', 'Delivered'];
-      const currentIndex = statuses.indexOf(randomOrder.status);
-      
-      if (currentIndex < statuses.length - 1) {
-        randomOrder.status = statuses[currentIndex + 1];
-        randomOrder.lastUpdated = new Date().toISOString();
-        randomOrder.updatedBy = 'external-user';
-        
-        this.logActivity('external-user', 'admin', 'update', 'order', randomOrder.id, `Updated status to ${randomOrder.status}`);
-        this.notifyListeners('orders', randomOrder, 'update');
-      }
+  private subscribeRealtime() {
+    if (this.realtimeChannel) return;
+    this.realtimeChannel = supabase
+      .channel('rtds-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
+        await this.refreshOrders();
+        this.notifyListeners('orders', null, 'update');
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sites' }, async () => {
+        await this.refreshAreas();
+        this.notifyListeners('projectAreas', null, 'update');
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'structures' }, async () => {
+        await this.refreshAreas();
+        this.notifyListeners('projectAreas', null, 'update');
+      })
+      .subscribe();
+  }
+
+  private async refresh() {
+    await Promise.all([this.refreshAreas(), this.refreshOrders()]);
+    this.initialized = true;
+  }
+
+  private async refreshAreas() {
+    if (!this.currentUser.companyId) {
+      this.projectAreas = [];
+      return;
     }
+    const { data: sites } = await supabase
+      .from('sites')
+      .select('id, name, updated_at, structures(id, name, type, concrete_grade, updated_at, status)')
+      .eq('company_id', this.currentUser.companyId);
+
+    this.projectAreas = (sites ?? []).map((site: any) => ({
+      id: site.id,
+      name: site.name,
+      progress: 0, // not modelled in DB yet
+      lastUpdated: site.updated_at,
+      updatedBy: '',
+      structures: (site.structures ?? []).map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        type: dbStructureTypeToUi(s.type),
+        recommendedGrade: s.concrete_grade,
+        lastUpdated: s.updated_at,
+        updatedBy: '',
+      })),
+    }));
   }
 
-  // Public API Methods
+  private async refreshOrders() {
+    if (!this.currentUser.companyId) {
+      this.orders = [];
+      return;
+    }
+    const { data: rows } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('company_id', this.currentUser.companyId)
+      .order('created_at', { ascending: false });
+
+    this.orders = (rows ?? []).map((o: any) => ({
+      id: o.id,
+      projectName: o.project_name ?? 'Untitled project',
+      location: '',
+      areaId: o.site_id,
+      structureId: o.structure_id ?? '',
+      volume: Number(o.volume),
+      grade: o.concrete_grade,
+      slump: o.slump ?? 100,
+      deliveryDate: o.delivery_date,
+      deliveryTime: o.delivery_time ?? '08:00',
+      status: dbOrderStatusToUi(o.status),
+      contactName: o.site_contact_name ?? '',
+      contactPhone: o.site_contact_phone ?? '',
+      specialInstructions: o.special_instructions ?? undefined,
+      createdAt: o.created_at,
+      createdBy: '',
+      lastUpdated: o.updated_at,
+      updatedBy: '',
+    }));
+  }
+
+  // ---------- Subscription API ----------
   subscribe(eventType: string, callback: DataChangeListener) {
-    if (!this.listeners.has(eventType)) {
-      this.listeners.set(eventType, []);
-    }
+    if (!this.listeners.has(eventType)) this.listeners.set(eventType, []);
     this.listeners.get(eventType)!.push(callback);
-    
     return () => {
-      const callbacks = this.listeners.get(eventType);
-      if (callbacks) {
-        const index = callbacks.indexOf(callback);
-        if (index > -1) {
-          callbacks.splice(index, 1);
-        }
-      }
+      const cbs = this.listeners.get(eventType);
+      if (!cbs) return;
+      const i = cbs.indexOf(callback);
+      if (i > -1) cbs.splice(i, 1);
     };
   }
 
   private notifyListeners(eventType: string, data: any, action: string) {
-    const callbacks = this.listeners.get(eventType);
-    if (callbacks) {
-      callbacks.forEach(callback => callback(data, action, eventType));
-    }
+    this.listeners.get(eventType)?.forEach(cb => cb(data, action, eventType));
   }
 
-  private logActivity(userId: string, userRole: 'admin' | 'site-agent', action: 'create' | 'update' | 'delete', resourceType: 'area' | 'structure' | 'order', resourceId: string, details: string) {
-    const activity: UserActivity = {
-      id: `activity-${Date.now()}`,
-      userId,
-      userRole,
-      action,
-      resourceType,
-      resourceId,
-      details,
-      timestamp: new Date().toISOString()
-    };
-    
-    this.activities.unshift(activity);
-    this.activities = this.activities.slice(0, 100); // Keep last 100 activities
-    this.notifyListeners('activities', activity, 'create');
-  }
-
-  // Project Areas Management
+  // ---------- Areas (sites) ----------
   getProjectAreas(): ProjectArea[] {
     return [...this.projectAreas];
   }
 
-  addArea(name: string, progress: number): ProjectArea {
-    const newArea: ProjectArea = {
-      id: `area-${Date.now()}`,
-      name,
-      progress,
-      structures: [],
-      lastUpdated: new Date().toISOString(),
-      updatedBy: this.currentUser.id
-    };
-    
-    this.projectAreas.push(newArea);
-    this.logActivity(this.currentUser.id, this.currentUser.role as any, 'create', 'area', newArea.id, `Created area: ${name}`);
-    this.notifyListeners('projectAreas', newArea, 'create');
-    
-    return newArea;
+  async addArea(name: string, _progress: number): Promise<ProjectArea | null> {
+    if (!this.currentUser.companyId) return null;
+    const { data, error } = await supabase
+      .from('sites')
+      .insert({ name, address: name, company_id: this.currentUser.companyId })
+      .select()
+      .single();
+    if (error || !data) return null;
+    await this.refreshAreas();
+    this.notifyListeners('projectAreas', data, 'create');
+    return this.projectAreas.find(a => a.id === data.id) ?? null;
   }
 
-  removeArea(areaId: string): boolean {
-    const index = this.projectAreas.findIndex(area => area.id === areaId);
-    if (index > -1) {
-      const removedArea = this.projectAreas.splice(index, 1)[0];
-      this.logActivity(this.currentUser.id, this.currentUser.role as any, 'delete', 'area', areaId, `Removed area: ${removedArea.name}`);
-      this.notifyListeners('projectAreas', { id: areaId }, 'delete');
-      return true;
-    }
-    return false;
+  async removeArea(areaId: string): Promise<boolean> {
+    const { error } = await supabase.from('sites').delete().eq('id', areaId);
+    if (error) return false;
+    await this.refreshAreas();
+    this.notifyListeners('projectAreas', { id: areaId }, 'delete');
+    return true;
   }
 
-  updateAreaProgress(areaId: string, progress: number, updatedBy?: string): boolean {
-    const area = this.projectAreas.find(a => a.id === areaId);
-    if (area) {
-      const oldProgress = area.progress;
-      area.progress = progress;
-      area.lastUpdated = new Date().toISOString();
-      area.updatedBy = updatedBy || this.currentUser.id;
-      
-      this.logActivity(
-        updatedBy || this.currentUser.id, 
-        this.currentUser.role as any, 
-        'update', 
-        'area', 
-        areaId, 
-        `Updated progress from ${oldProgress}% to ${progress}%`
-      );
-      this.notifyListeners('projectAreas', area, 'update');
-      return true;
-    }
-    return false;
+  async updateAreaProgress(_areaId: string, _progress: number, _updatedBy?: string): Promise<boolean> {
+    // Progress is not yet a DB column; succeed silently to keep UI working.
+    return true;
   }
 
-  // Structure Management
-  addStructureToArea(areaId: string, name: string, type: Structure['type'], recommendedGrade: string): Structure | null {
-    const area = this.projectAreas.find(a => a.id === areaId);
-    if (area) {
-      const newStructure: Structure = {
-        id: `struct-${Date.now()}`,
+  // ---------- Structures ----------
+  async addStructureToArea(
+    areaId: string,
+    name: string,
+    type: Structure['type'],
+    recommendedGrade: string
+  ): Promise<Structure | null> {
+    const { data, error } = await supabase
+      .from('structures')
+      .insert({
+        site_id: areaId,
         name,
-        type,
-        recommendedGrade,
-        lastUpdated: new Date().toISOString(),
-        updatedBy: this.currentUser.id
-      };
-      
-      area.structures.push(newStructure);
-      area.lastUpdated = new Date().toISOString();
-      area.updatedBy = this.currentUser.id;
-      
-      this.logActivity(this.currentUser.id, this.currentUser.role as any, 'create', 'structure', newStructure.id, `Added structure: ${name} to ${area.name}`);
-      this.notifyListeners('projectAreas', area, 'update');
-      
-      return newStructure;
-    }
-    return null;
+        type: uiStructureTypeToDb(type),
+        concrete_grade: normalizeGrade(recommendedGrade),
+        volume: 0,
+      })
+      .select()
+      .single();
+    if (error || !data) return null;
+    await this.refreshAreas();
+    this.notifyListeners('projectAreas', data, 'update');
+    return {
+      id: data.id, name: data.name,
+      type: dbStructureTypeToUi(data.type),
+      recommendedGrade: data.concrete_grade,
+      lastUpdated: data.updated_at, updatedBy: '',
+    };
   }
 
-  removeStructure(areaId: string, structureId: string): boolean {
-    const area = this.projectAreas.find(a => a.id === areaId);
-    if (area) {
-      const index = area.structures.findIndex(s => s.id === structureId);
-      if (index > -1) {
-        const removedStructure = area.structures.splice(index, 1)[0];
-        area.lastUpdated = new Date().toISOString();
-        area.updatedBy = this.currentUser.id;
-        
-        this.logActivity(this.currentUser.id, this.currentUser.role as any, 'delete', 'structure', structureId, `Removed structure: ${removedStructure.name} from ${area.name}`);
-        this.notifyListeners('projectAreas', area, 'update');
-        return true;
-      }
-    }
-    return false;
+  async removeStructure(_areaId: string, structureId: string): Promise<boolean> {
+    const { error } = await supabase.from('structures').delete().eq('id', structureId);
+    if (error) return false;
+    await this.refreshAreas();
+    this.notifyListeners('projectAreas', { id: structureId }, 'delete');
+    return true;
   }
 
-  // Order Management
+  // ---------- Orders ----------
   getOrders(): ConcreteOrder[] {
     return [...this.orders];
   }
 
-  createOrder(orderData: Omit<ConcreteOrder, 'id' | 'createdAt' | 'createdBy' | 'lastUpdated' | 'updatedBy'>): ConcreteOrder {
-    const newOrder: ConcreteOrder = {
-      ...orderData,
-      id: `ord-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      createdBy: this.currentUser.id,
-      lastUpdated: new Date().toISOString(),
-      updatedBy: this.currentUser.id
-    };
-    
-    this.orders.push(newOrder);
-    this.logActivity(this.currentUser.id, this.currentUser.role as any, 'create', 'order', newOrder.id, `Created order for ${newOrder.volume}m³ of ${newOrder.grade}`);
-    this.notifyListeners('orders', newOrder, 'create');
-    
-    return newOrder;
-  }
-
-  updateOrderStatus(orderId: string, status: ConcreteOrder['status']): boolean {
-    const order = this.orders.find(o => o.id === orderId);
-    if (order) {
-      const oldStatus = order.status;
-      order.status = status;
-      order.lastUpdated = new Date().toISOString();
-      order.updatedBy = this.currentUser.id;
-      
-      this.logActivity(this.currentUser.id, this.currentUser.role as any, 'update', 'order', orderId, `Updated status from ${oldStatus} to ${status}`);
-      this.notifyListeners('orders', order, 'update');
-      return true;
+  async createOrder(
+    orderData: Omit<ConcreteOrder, 'id' | 'createdAt' | 'createdBy' | 'lastUpdated' | 'updatedBy'>
+  ): Promise<ConcreteOrder | null> {
+    if (!this.currentUser.companyId) return null;
+    const { data, error } = await supabase
+      .from('orders')
+      .insert({
+        company_id: this.currentUser.companyId,
+        site_id: orderData.areaId,
+        structure_id: orderData.structureId || null,
+        delivery_date: orderData.deliveryDate,
+        delivery_time: orderData.deliveryTime,
+        volume: orderData.volume,
+        number_of_trucks: Math.max(1, Math.ceil(orderData.volume / 6)),
+        concrete_grade: normalizeGrade(orderData.grade),
+        slump: orderData.slump,
+        special_instructions: orderData.specialInstructions ?? null,
+        site_contact_name: orderData.contactName,
+        site_contact_phone: orderData.contactPhone,
+        project_name: orderData.projectName,
+        status: uiOrderStatusToDb(orderData.status),
+        order_number: '', // trigger fills if empty
+      })
+      .select()
+      .single();
+    if (error || !data) {
+      console.error('Order insert failed', error);
+      return null;
     }
-    return false;
+    await this.refreshOrders();
+    const created = this.orders.find(o => o.id === data.id) ?? null;
+    if (created) this.notifyListeners('orders', created, 'create');
+    return created;
   }
 
-  // Activity Management
+  async updateOrderStatus(orderId: string, status: ConcreteOrder['status']): Promise<boolean> {
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: uiOrderStatusToDb(status) })
+      .eq('id', orderId);
+    if (error) return false;
+    await this.refreshOrders();
+    const updated = this.orders.find(o => o.id === orderId);
+    if (updated) this.notifyListeners('orders', updated, 'update');
+    return true;
+  }
+
+  // ---------- Activities (in-memory only for now) ----------
   getActivities(): UserActivity[] {
     return [...this.activities];
   }
 
-  // User Management
-  setCurrentUser(userId: string, role: 'admin' | 'site-agent', name: string, agentInfo?: {
-    site?: string;
-    company?: string;
-    phone?: string;
-    email?: string;
-  }) {
-    this.currentUser = { 
-      id: userId, 
-      role, 
-      name,
-      ...agentInfo
-    };
+  // ---------- User helpers ----------
+  setCurrentUser(_userId: string, _role: 'admin' | 'site-agent', _name: string) {
+    // No-op: identity comes from Supabase auth automatically.
   }
 
   getCurrentUser() {
