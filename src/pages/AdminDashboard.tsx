@@ -11,12 +11,12 @@ import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { RealtimeStatusBadge } from '@/components/dashboard/RealtimeStatusBadge';
 
 const AdminDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const realtimeStatus = useRealtimeSync();
 
   const handleSignOut = () => {
-    logout();
+    signOut();
   };
 
   return (

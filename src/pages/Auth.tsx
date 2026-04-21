@@ -73,7 +73,7 @@ const Auth = () => {
       return;
     }
     setLoading(true);
-    const { error } = await signUp(parsed.data);
+    const { error } = await signUp(parsed.data as Parameters<typeof signUp>[0]);
     setLoading(false);
     if (error) {
       toast({ title: 'Sign up failed', description: error.message, variant: 'destructive' });
